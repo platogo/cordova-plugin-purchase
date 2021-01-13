@@ -3035,7 +3035,7 @@ function ensureObject(obj) {
 function extendAdditionalData(ad) {
     var additionalData = ensureObject(ad);
     if (!additionalData.accountId && additionalData.applicationUsername) {
-        additionalData.accountId = store.utils.md5(additionalData.applicationUsername);
+        additionalData.accountId = additionalData.applicationUsername;
     }
     return additionalData;
 }
@@ -3510,7 +3510,7 @@ store.extendAdditionalData = function(product) {
     //      generate a string from the user's ID and store the hashed
     //      string in this field.
     if (!a.accountId && a.applicationUsername) {
-        a.accountId = store.utils.md5(a.applicationUsername);
+        a.accountId = a.applicationUsername;
     }
 
     //  - `developerId` : **string**
@@ -3583,7 +3583,7 @@ function getDeveloperPayload(product) {
         return "";
     }
     return JSON.stringify({
-        applicationUsernameMD5: store.utils.md5(applicationUsername),
+        applicationUsernameMD5: applicationUsername,
     });
 }
 
