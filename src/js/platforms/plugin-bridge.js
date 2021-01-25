@@ -95,7 +95,7 @@ function ensureObject(obj) {
 function extendAdditionalData(ad) {
     var additionalData = ensureObject(ad);
     if (!additionalData.accountId && additionalData.applicationUsername) {
-        additionalData.accountId = store.utils.md5(additionalData.applicationUsername);
+        additionalData.accountId = additionalData.applicationUsername;
     }
     return additionalData;
 }
