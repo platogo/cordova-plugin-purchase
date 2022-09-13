@@ -345,6 +345,24 @@ store.sandbox = false;
 ///    store.redeem();
 /// ```
 
+///
+/// ## <a name="launchPriceChangeConfirmationFlow"></a>*store.launchPriceChangeConfirmationFlow(callback)*
+///
+/// Android only: display a generic dialog notifying the user of a subscription price change.
+///
+/// See https://developer.android.com/google/play/billing/subscriptions#price-change-communicate
+///
+/// * This call does nothing on iOS and Microsoft UWP.
+///
+/// ##### example usage
+///
+/// ```js
+///    store.launchPriceChangeConfirmationFlow(function(status) {
+///      if (status === "OK") { /* approved */ }
+///      if (status === "UserCanceled") { /* dialog canceled by user */ }
+///    }));
+/// ```
+
 // #include "log.js"
 // #include "metadata.js"
 
@@ -376,4 +394,4 @@ store.getGroup = function(groupId) {
 // #include "utils.js"
 // #include "polyfills.js"
 
-store.version = '10.5.3';
+store.version = '11.0.0';
