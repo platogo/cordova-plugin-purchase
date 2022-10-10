@@ -420,6 +420,13 @@ var ERROR_CODES_BASE = 6777000;
 ///
 /*///*/     store.APPLICATION = "application";
 
+///
+/// ### recurrence modes
+///
+/*///*/     store.NON_RECURRING = "NON_RECURRING";
+/*///*/     store.FINITE_RECURRING = "FINITE_RECURRING";
+/*///*/     store.INFINITE_RECURRING = "INFINITE_RECURRING";
+
 })();
 (function() {
 
@@ -543,11 +550,19 @@ store.Product = function(options) {
     ///  - `product.downloaded` - Non-consumable content has been successfully downloaded for this product
     this.downloaded = options.downloaded;
 
-    ///  - `product.additionalData` - additional data possibly required for product purchase
+    ///  - `product.additionalData` - Additional data possibly required for product purchase
     this.additionalData = options.additionalData || null;
 
     ///  - `product.transaction` - Latest transaction data for this product (see [transactions](#transactions)).
     this.transaction = null;
+
+    /// - `product.offers` - List of offers available for purchasing a product.
+    ///     - when not null, it contains an array of virtual product identifiers, you can fetch those virtual products as usual, with `store.get(id)`.
+    this.offers = null;
+
+    /// - `product.pricingPhases` - Since v11, when a product is paid for in multiple phases (for example, trial followed by paid periods), this contains the list of phases.
+    ///     - Example: [{"price":"€1.19","priceMicros":1190000,"currency":"EUR","billingPeriod":"P1W","billingCycles":0,"recurrenceMode":"INFINITE_RECURRING","paymentMode":"PayAsYouGo"}]
+    this.pricingPhases = null;
 
     ///  - `product.expiryDate` - Latest known expiry date for a subscription (a javascript Date)
     ///  - `product.lastRenewalDate` - Latest date a subscription was renewed (a javascript Date)
@@ -728,7 +743,7 @@ store.Product.prototype.verify = function() {
                 else if (nRetry < 4) {
                     // It failed... let's try one more time. Maybe the appStoreReceipt wasn't updated yet.
                     nRetry += 1;
-                    delay(this, tryValidation, 1500 * nRetry * nRetry);
+                    delay(this, tryValidation, (1500 + nRetry * 1000) * nRetry * nRetry);
                 }
                 else {
                     store.log.debug("validation failed, no retrying, trigger an error");
@@ -1309,6 +1324,7 @@ var callbackId = 0;
 ///       - `IMMEDIATE_AND_CHARGE_PRORATED_PRICE` - Replacement takes effect immediately, and the billing cycle remains the same.
 ///       - `IMMEDIATE_WITHOUT_PRORATION` - Replacement takes effect immediately, and the new price will be charged on next recurrence time.
 ///       - `IMMEDIATE_WITH_TIME_PRORATION` - Replacement takes effect immediately, and the remaining time will be prorated and credited to the user.
+///       - `IMMEDIATE_AND_CHARGE_FULL_PRICE` - The subscription is upgraded or downgraded and the user is charged full price for the new entitlement immediately. The remaining value from the previous subscription is either carried over for the same entitlement, or prorated for time when switching to a different entitlement.
 ///    - `discount`, a object that describes the discount to apply with the purchase (iOS only):
 ///       - `id`, discount identifier
 ///       - `key`, key identifier
@@ -1677,8 +1693,9 @@ function runValidation() {
 
       // Post
       store.utils.ajax({
-          url: store.validator,
+          url: (typeof store.validator === 'string') ? store.validator : store.validator.url,
           method: 'POST',
+          customHeaders: (typeof store.validator === 'string') ? null : store.validator.headers,
           data: data,
           success: function(data) {
               store.log.debug("validator success, response: " + JSON.stringify(data));
@@ -1826,7 +1843,7 @@ store._validator = function(product, callback, isPrepared) {
         return;
     }
 
-    if (typeof store.validator === 'string') {
+    if (typeof store.validator === 'string' || typeof store.validator === 'object') {
         validationRequests.push({
             product: product,
             callback: callback
@@ -2169,6 +2186,25 @@ store.refresh = function() {
 ///
 /// ```js
 ///    store.redeem();
+/// ```
+
+///
+/// ## <a name="launchPriceChangeConfirmationFlow"></a>*store.launchPriceChangeConfirmationFlow(productId, callback)*
+///
+/// Android only: display a generic dialog notifying the user of a subscription price change.
+///
+/// See https://developer.android.com/google/play/billing/subscriptions#price-change-communicate
+///
+/// * This call does nothing on iOS and Microsoft UWP.
+///
+/// ##### example usage
+///
+/// ```js
+///    store.launchPriceChangeConfirmationFlow(function('product_id', status) {
+///      if (status === "OK") { /* approved */ }
+///      if (status === "UserCanceled") { /* dialog canceled by user */ }
+///      if (status === "UnknownProduct") { /* trying to update price of an unregistered product */ }
+///    }));
 /// ```
 
 (function(){
@@ -2828,6 +2864,9 @@ store.utils = {
     /// * `data`: body of your request
     ///
     ajax: function(options) {
+        if (typeof window !== 'undefined' && window.cordova && window.cordova.plugin && window.cordova.plugin.http) {
+            return store.utils.ajaxWithHttpPlugin(options);
+        }
         var doneCb = function(){};
         var xhr = new XMLHttpRequest();
         xhr.open(options.method || 'POST', options.url, true);
@@ -2850,6 +2889,12 @@ store.utils = {
             if (xhr.readyState === 4)
                 store.utils.callExternal('ajax.done', doneCb);
         };
+        if (options.customHeaders) {
+            Object.keys(options.customHeaders).forEach(function (header) {
+                store.log.debug('ajax -> adding custom header: ' + header );
+                xhr.setRequestHeader( header, options.customHeaders[header]);
+            });
+        }
         xhr.setRequestHeader("Accept", "application/json");
         store.log.debug('ajax -> send request to ' + options.url);
         if (options.data) {
@@ -2862,6 +2907,41 @@ store.utils = {
         return {
             done: function(cb) { doneCb = cb; return this; }
         };
+    },
+
+    ajaxWithHttpPlugin: function(options) {
+        var doneCb = function(){};
+        var ajaxOptions = {
+            method: (options.method || 'get').toLowerCase(),
+            data: options.data,
+            serializer: 'json',
+            // responseType: 'json',
+        };
+        if (options.customHeaders) {
+            store.log.debug('ajax[http] -> adding custom headers: ' + JSON.stringify(options.customHeaders));
+            ajaxOptions.headers = options.customHeaders;
+        }
+        store.log.debug('ajax[http] -> send request to ' + options.url);
+        cordova.plugin.http.sendRequest(options.url, ajaxOptions, ajaxDone, ajaxDone);
+        return {
+            done: function(cb) { doneCb = cb; return this; }
+        };
+        function ajaxDone(response) {
+            try {
+                if (response.status == 200) {
+                    store.utils.callExternal('ajax.success', options.success, JSON.parse(response.data));
+                }
+                else {
+                    store.log.warn("ajax[http] -> request to " + options.url + " failed with status " + response.status + " (" + response.error + ")");
+                    store.utils.callExternal('ajax.error', options.error, response.status, response.error);
+                }
+            }
+            catch (e) {
+                store.log.warn("ajax[http] -> request to " + options.url + " failed with an exception: " + e.message);
+                if (options.error) store.utils.callExternal('ajax.error', options.error, 417, e.message);
+            }
+            store.utils.callExternal('ajax.done', doneCb);
+        }
     },
 
     ///
@@ -2958,7 +3038,7 @@ if (typeof Object.assign != 'function') {
     };
 }
 
-store.version = '10.5.3';
+store.version = '11.0.0';
 /*
  * A plugin to enable iOS In-App Purchases.
  *
@@ -3975,6 +4055,10 @@ store.manageSubscriptions = function() {
 
 store.manageBilling = function() {
     storekit.manageBilling();
+};
+
+store.launchPriceChangeConfirmationFlow = function(productId, callback) {
+    callback('UserCanceled');
 };
 
 /// store.redeemCode({ type: 'subscription_offer_code' });

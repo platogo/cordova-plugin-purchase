@@ -495,6 +495,10 @@ store.manageBilling = function() {
     storekit.manageBilling();
 };
 
+store.launchPriceChangeConfirmationFlow = function(productId, callback) {
+    callback('UserCanceled');
+};
+
 /// store.redeemCode({ type: 'subscription_offer_code' });
 store.redeem = function() {
     // By default, we call presentCodeRedemptionSheet.

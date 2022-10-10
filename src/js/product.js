@@ -120,11 +120,19 @@ store.Product = function(options) {
     ///  - `product.downloaded` - Non-consumable content has been successfully downloaded for this product
     this.downloaded = options.downloaded;
 
-    ///  - `product.additionalData` - additional data possibly required for product purchase
+    ///  - `product.additionalData` - Additional data possibly required for product purchase
     this.additionalData = options.additionalData || null;
 
     ///  - `product.transaction` - Latest transaction data for this product (see [transactions](#transactions)).
     this.transaction = null;
+
+    /// - `product.offers` - List of offers available for purchasing a product.
+    ///     - when not null, it contains an array of virtual product identifiers, you can fetch those virtual products as usual, with `store.get(id)`.
+    this.offers = null;
+
+    /// - `product.pricingPhases` - Since v11, when a product is paid for in multiple phases (for example, trial followed by paid periods), this contains the list of phases.
+    ///     - Example: [{"price":"€1.19","priceMicros":1190000,"currency":"EUR","billingPeriod":"P1W","billingCycles":0,"recurrenceMode":"INFINITE_RECURRING","paymentMode":"PayAsYouGo"}]
+    this.pricingPhases = null;
 
     ///  - `product.expiryDate` - Latest known expiry date for a subscription (a javascript Date)
     ///  - `product.lastRenewalDate` - Latest date a subscription was renewed (a javascript Date)
@@ -305,7 +313,7 @@ store.Product.prototype.verify = function() {
                 else if (nRetry < 4) {
                     // It failed... let's try one more time. Maybe the appStoreReceipt wasn't updated yet.
                     nRetry += 1;
-                    delay(this, tryValidation, 1500 * nRetry * nRetry);
+                    delay(this, tryValidation, (1500 + nRetry * 1000) * nRetry * nRetry);
                 }
                 else {
                     store.log.debug("validation failed, no retrying, trigger an error");
