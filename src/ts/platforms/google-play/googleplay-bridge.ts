@@ -319,7 +319,7 @@ namespace CdvPurchase {
             function extendAdditionalData(ad?: CdvPurchase.AdditionalData): AdditionalData {
                 const additionalData: AdditionalData = ensureObject(ad?.googlePlay);
                 if (!additionalData.accountId && ad?.applicationUsername) {
-                    additionalData.accountId = Utils.md5(ad.applicationUsername);
+                    additionalData.accountId = ad.applicationUsername;
                 }
                 return additionalData;
             }
