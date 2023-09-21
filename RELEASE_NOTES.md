@@ -1,6 +1,416 @@
 # Release Notes - Cordova Plugin Purchase
 
+## 13.6
+
+### 13.6.0
+
+#### Add store.when().receiptsReady(cb)
+
+The "receiptsReady" event is triggered only once, as soon as all platforms are
+done loading the receipts from the SDK.
+
+It can be used by applications that do not rely on receipt validation, in order
+to wait for the list of purchases reported by the native SDK to have been
+processed. For example, before running some code that check products ownership
+statuses at startup.
+
+```ts
+// at startup
+CdvPurchase.store.when().receiptsReady(() => {
+  console.log('All platforms have loaded their local receipts');
+  console.log('Feature X: ' + CdvPurchase.store.get('unlock-feature-x').owned);
+});
+```
+
+If the receipts have already been loaded before you setup this event handler,
+it will be called immediately.
+
+Users using a receipt validation server should rely on receiptsVerified()
+instead (see below).
+
+#### Add store.when().receiptsVerified(cb)
+
+Similarly to "receiptsReady", "receiptsVerified" is triggered only once: after
+all platforms have loaded their receipts and those have been verified by the
+receipt validation server.
+
+It can be used by applications that DO rely on receipt validation, in order to
+wait for all receipts to have been processed by the receipt validation service.
+A good use case is to encapsulate startup code that check products ownership
+status.
+
+```ts
+// at startup
+CdvPurchase.store.when().receiptsVerified(() => {
+  console.log('Receipts have been validated');
+  if (CdvPurchase.store.get('monthly').owned) {
+    openMainScreen();
+  }
+  else {
+    openSubscriptionScreen();
+  }
+});
+```
+
+If the receipts have already been verified before you setup this event handler,
+it will be called immediately.
+
+#### Add store.when().pending(cb)
+
+This event handler can be notified when a transaction enters the "PENDING"
+state, which happens when a user has "Ask to Buy" enabled, or in country where
+cash payment is an option.
+
+```ts
+store.when().pending(transaction => {
+  // Transaction is pending (waiting for parent approval, cash payment, ...)
+});
+```
+
+#### Remove autogrouping of products
+
+Starting at version 13.4.0, products were automatically added to the "default"
+group. This created more issues than it solved, because it let the plugin
+automatically try to replace potentially unrelated products.
+
+People willing to rely on automatic subscription replacement on Android should
+explicitely set those product's `group` property when registering them. Or
+should use the `oldPurchaseToken` property when making an order.
+
+**Examples:**
+
+```ts
+// Replace an old purchase when finalizing the new one on google play.
+store.order(product, {
+  googlePlay: {
+    oldPurchaseToken: 'abcdefghijkl',
+    prorationMode: CdvPurchase.GooglePlay.ProrationMode.IMMEDIATE_AND_CHARGE_PRORATED_PRICE,
+  }
+});
+
+// For those 2 subscription products, the plugin will automatically replace
+// the currently owned one (if any) when placing a new order.
+store.register([{
+  id: 'no_ads_yearly',
+  type: ProductType.PAID_SUBSCRIPTION,
+  platform: Platform.GOOGLE_PLAY,
+  group: 'noAds'
+}, {
+  id: 'no_ads_monthly',
+  type: ProductType.PAID_SUBSCRIPTION,
+  platform: Platform.GOOGLE_PLAY,
+  group: 'noAds'
+}]);
+```
+
+## 13.5
+
+### 13.5.0 - Add timeout to validation requests
+
+By default, the plugin will now setup a 20 seconds timeout for receipt validation requests.
+
+Receipt validation timeout can be detected using the following code:
+
+```ts
+CdvPurchase.store.when().unverified(function(response) {
+  if (response.payload.code === CdvPurchase.ErrorCode.COMMUNICATION) {
+    if (response.payload.status === CdvPurchase.Utils.Ajax.HTTP_REQUEST_TIMEOUT) {
+      // request timeout
+    }
+  }
+});
+```
+
+The value for timeout can be customized by specifying the validator this way:
+
+```ts
+CdvPurchase.store.validator = {
+  url: 'https://validator.iaptic.com',
+  timeout: 30000, // in milliseconds
+}
+```
+
+## 13.4
+
+### 13.4.3 - Add HTTP status to receipt validation error payload
+
+Let the app know the HTTP status for a failed receipt validation call, in "response.payload.status".
+
+```ts
+CdvPurchase.store.when().unverified(response => {
+    if (response.payload.code === CdvPurchase.ErrorCode.COMMUNICATION) {
+        console.log("HTTP ERROR: " + response.payload.status);
+    }
+});
+```
+
+### 13.4.2 - Fix "owned" status when validator returns "isExpired"
+
+Attempt to fix issue #1406 on iOS, with Ionic v6: `applicationUsername` isn't attached to purchase, it seems like this is due to strings passed as a subclass of NSString on this platform.
+
+### 13.4.1 - Fix "owned" status when validator returns "isExpired"
+
+Issue #1408 fixed. If the validator returns `isExpired`, the `owned()` method was returning an incorrect result.
+
+### 13.4.0 - Product groups and Google Play
+
+Products are now part of the `"default"` group when none is provided, as per the documentation. This is used on Google Play to automatically replace existing subscription by the newly ordered one.
+
+This update can break your app if you have multiple **independent** subscription products on Google Play, as purchasing a subscription product will now cancel any existing one by default.
+
+Use the `group` property in `store.register` to force legacy subscription products to be part of different groups.
+
+## 13.3
+
+Adding back functionalities that existed in version 11 of the plugin, mostly on iOS, and a few fixes. Detail below.
+
+### 13.3.3 - Use canMakePayments on Apple AppStore
+
+`offer.canPurchase` will be false if the platform reports that it doesn't support the "order" functionality.
+
+When you check if the offer can be purchased, the plugin will now use the value from `canMakePurchases` (for Apple AppStore).
+
+```ts
+if (!offer.canPurchase) {
+  // the given offer cannot be purchased. hide it or hide the buy button.
+}
+```
+
+If none of the offers can be purchased, you can choose to hide the whole store.
+
+There are 2 reasons why an offer cannot be purchased:
+
+1. Product is already owned (see `product.owned`)
+2. The adapter don't support "order()"
+
+If you really want to access the low-level value of `canMakePurchases` you can do it like so:
+
+```
+const appStore = store.getAdapter(CdvPurchase.Platform.APPLE_APPSTORE);
+if (appStore && appStore.checkSupport('order')) {
+  // user can make payments
+}
+```
+
+Ref #1378
+
+### 13.3.2 - Add support for promotional offers on Apple AppStore
+
+You can order a discount offer by providing additional data to "offer.order()" like so:
+
+```ts
+offer.order({
+  appStore: {
+    discount: {
+      id: "discount-id",
+      key: "...",
+      nonce: "...",
+      signature: "...",
+      timestamp: "...",
+    }
+  }
+});
+```
+
+Check Apple documentation about the meaning of those fields and how to fill them. https://developer.apple.com/documentation/storekit/in-app_purchase/original_api_for_in-app_purchase/subscriptions_and_offers/setting_up_promotional_offers?language=objc
+
+You can check this old example server here: https://github.com/j3k0/nodejs-suboffer-signature-server
+
+### 13.3.1 - Fix "store.order" promise resolution
+
+Wait for the transaction to be purchased or the purchase cancelled before resolving.
+
+Example usage:
+
+```ts
+store.order(offer)
+  .then((result) => {
+    if (result && result.isError) {
+      if (result.code === CdvPurchase.ErrorCode.PAYMENT_CANCELLED) {
+        // Payment cancelled: window closed by user
+      }
+      else {
+        // Payment failed: check result.message
+      }
+    }
+    else {
+      // Success
+    }
+  });
+```
+
+### 13.3.0
+
+#### Add the AppStore `autoFinish` option
+
+Use this if the transaction queue is filled with unwanted transactions (in development).
+It's safe to keep this option to "true" when using a receipt validation server and you only sell subscriptions
+
+Example:
+
+```ts
+store.initialize([
+  {
+    platform: Platform.APPLE_APPSTORE,
+    options: { autoFinish: true }
+  },
+  Platform.GOOGLE_PLAY
+]);
+```
+
+#### Optimize AppStore receipt loaded multiple times in parallel
+
+When the Apple `appStoreReceipt` is loaded from multiple source, it resulted in a lot of duplicate calls. 13.3.0 optimizes this use case.
+
+#### Add transactionId and purchaseId to VerifiedPurchase
+
+It's just a TypeScript definition since the plugin doesn't do much with it, but it has been requested by a few users.
+
+## 13.2
+
+### 13.2.1 - Fixing parsing of incorrectly formatted validator response
+
+### 13.2.0
+
+#### Adding store.when().unverified()
+
+`unverified` will be called when receipt validation failed.
+
+#### Fixing `Product.pricing`
+
+Issue #1368 fixed: `product.pricing` was always `undefined`.
+
+## 13.1
+
+### 13.1.6 - Fixing `appStoreReceipt` null on first launch
+
+Bug hasn't been reproduced, but the fix should handle the error case that happened to this user (based on the provided logs).
+
+### 13.1.5 - AppStore fixes
+
+- 51400ab Adding in-progress transaction to a pseudo receipt
+- c0e47b3 Reloading receipt from native side before receipt validation
+- 5a8542b Improved error reporting
+- 7a80a6d Do not call "finished" for failed transactions
+- 348431e Report success/failure of purchase
+- e53017c Fix crash when logged out of iCloud (#1354)
+
+### 13.1.4 - AppStore fixes
+
+* b692e21 Don't error if finishing already finished transaction
+* 49c0508 Force receipt refresh after order() and restorePurchases()
+
+### 13.1.3
+
+Fixing some receipt validation use cases on Apple devices.
+
+* 9cfce2d Load missing iOS appStoreReceipt when validation call is requested
+* 2569147 Update validator functions to include the receipts
+* f03a751 Refresh appStoreReceipt if empty at validation stage
+
+### Update to requestPayment()
+
+In the payment request, the `items` array now replace the `productIds` array. Use this array to define the list of items the user is paying for. For example:
+
+```ts
+CdvPurchase.store.requestPayment({
+  platform: CdvPurchase.Platform.BRAINTREE,
+  amountMicros: 11000000,
+  currency: 'USD',
+  items: [{
+    id: 'margherita_large',
+    title: 'Pizza Margherita Large',
+    pricing: {
+      priceMicros: 10000000,
+    }
+  }, {
+    id: 'delivery_standard',
+    title: 'Delivery',
+    pricing: {
+      priceMicros: 1000000,
+    }
+  }]
+});
+```
+
+The format for items makes them compatible with products loaded from the stores. You can then manage your inventory on Google Play but allow payment for those Google Play products using Braintree:
+
+```ts
+store.register([{
+  id: 'five_tokens',
+  type: ProductType.CONSUMABLE
+  platform: Platform.GOOGLE_PLAY,
+}]);
+
+// Later on...
+store.requestPayment({
+  platform: CdvPurchase.Platform.BRAINTREE,
+  amountMicros: 11000000,
+  currency: 'USD',
+  items: [store.get('five_tokens')],
+});
+```
+
+See [PaymentRequest](https://github.com/j3k0/cordova-plugin-purchase/blob/master/api/interfaces/CdvPurchase.PaymentRequest.md) and [PaymentRequestItem](https://github.com/j3k0/cordova-plugin-purchase/blob/master/api/interfaces/CdvPurchase.PaymentRequestItem.md) for details.
+
+### Fixes for Braintree.requestPayment()
+
+Bug fixes:
+
+* Properly using the provided `applePayOptions`
+* Detecting payment request cancellations by user
+
+### requestPayment() amount computed from items
+
+If the amount is not provided in a payment request, it will be computed as the sum of all items.
+
+Currency will also be retrieved from the items when missing.
+
+## 13.0
+
+This is a full rewrite of the API, updated to allow:
+
+ * using multiple payment processors in parallel
+ * exposing multiple offers for a single product and complex pricing
+ * exposing purchases from receipts (either local receipts or verified from a server)
+ * placing custom payment requests
+
+All JavaScript code has being rewritten in TypeScript, typings are now 100% complete and accurate.
+
+If you're upgrading from an earlier version, check the [migration guide](https://github.com/j3k0/cordova-plugin-purchase/wiki/HOWTO:-Migrate-to-v13).
+
+The native code is built using version 12 as starting point, so all features from version 12 are available as well.
+
+### Braintree
+
+This version introduces support for Braintree as a payment processor, it requires an additional plugin to add the libraries to your project: https://github.com/j3k0/cordova-plugin-purchase-braintree
+
+The Braintree integration supports payment with 3DSecure and Apple Pay.
+
+### Windows Store
+
+Support for payments on Windows Store has been dropped. It will be back in a later version.
+
+### Overview
+
+The new API separates the different concepts with their own first-level entities:
+
+- Products
+- Offers
+- Receipts
+- Transactions
+
+**Products / Offers** will contain the definition of what's available to the user to purchase.
+
+**Receipts / Transactions** will contain details about what the user has purchased.
+
+In the new API, it is possible to initiate transactions not necessarily linked with a product (using payment processors like Braintree).
+
+It defines a generic Adapter interface, implemented by the various payment platforms. The core of the plugin controls and monitors the different active adapters and expose the unified API. Previously, we basically had an iOS implementation of the unified API (using StoreKit), an android implementation, etc... Now, many adapters can coexist in peace.
+
 ## 12.0.0
+
+This was a first attempt to port the code to billing library v5. It's not recommended to use this version as, trying to keep the API backward compatible, made it messy and bug prone. Use version 13.
 
 ### Upgrade to Google Play Billing library v5.0
 
