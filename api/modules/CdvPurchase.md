@@ -87,7 +87,9 @@ const {store, ProductType, Platform, LogLevel} = CdvPurchase;
 
 ### Callback
 
-Ƭ **Callback**<`T`\>: (`t`: `T`) => `void`
+Ƭ **Callback**\<`T`\>: (`t`: `T`) => `void`
+
+Callback
 
 #### Type parameters
 
@@ -98,8 +100,6 @@ const {store, ProductType, Platform, LogLevel} = CdvPurchase;
 #### Type declaration
 
 ▸ (`t`): `void`
-
-Callback
 
 ##### Parameters
 
@@ -129,7 +129,7 @@ Functionality optionality provided by a given platform.
 
 **`See`**
 
-[checkSupport](../classes/CdvPurchase.Store.md#checksupport)
+[Store.checkSupport](../classes/CdvPurchase.Store.md#checksupport)
 
 ___
 
@@ -141,7 +141,7 @@ Used to initialize a platform with some options
 
 **`See`**
 
-[initialize](../classes/CdvPurchase.Store.md#initialize)
+[Store.initialize](../classes/CdvPurchase.Store.md#initialize)
 
 ___
 
@@ -153,7 +153,7 @@ ___
 
 ### PLUGIN\_VERSION
 
-• `Const` **PLUGIN\_VERSION**: ``"13.6.0"``
+• `Const` **PLUGIN\_VERSION**: ``"13.11.1"``
 
 Current release number of the plugin.
 

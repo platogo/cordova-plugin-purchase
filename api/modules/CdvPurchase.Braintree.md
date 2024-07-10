@@ -38,11 +38,15 @@
 
 - [customerId](CdvPurchase.Braintree.md#customerid)
 
+### Functions
+
+- [braintreeError](CdvPurchase.Braintree.md#braintreeerror)
+
 ## Type Aliases
 
 ### ClientTokenProvider
 
-Ƭ **ClientTokenProvider**: (`callback`: [`Callback`](CdvPurchase.md#callback)<`string` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>) => `void`
+Ƭ **ClientTokenProvider**: (`callback`: [`Callback`](CdvPurchase.md#callback)\<`string` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>) => `void`
 
 #### Type declaration
 
@@ -52,7 +56,7 @@
 
 | Name | Type |
 | :------ | :------ |
-| `callback` | [`Callback`](CdvPurchase.md#callback)<`string` \| [`IError`](../interfaces/CdvPurchase.IError.md)\> |
+| `callback` | [`Callback`](CdvPurchase.md#callback)\<`string` \| [`IError`](../interfaces/CdvPurchase.IError.md)\> |
 
 ##### Returns
 
@@ -107,3 +111,20 @@ ___
 • **customerId**: `string` \| `undefined`
 
 The Braintree customer identifier. Set it to allow reusing of payment methods.
+
+## Functions
+
+### braintreeError
+
+▸ **braintreeError**(`code`, `message`): [`IError`](../interfaces/CdvPurchase.IError.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `code` | [`ErrorCode`](../enums/CdvPurchase.ErrorCode.md) |
+| `message` | `string` |
+
+#### Returns
+
+[`IError`](../interfaces/CdvPurchase.IError.md)

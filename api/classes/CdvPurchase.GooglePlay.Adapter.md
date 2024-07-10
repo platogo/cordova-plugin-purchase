@@ -23,7 +23,9 @@ Adapter for a payment or in-app purchase platform
 - [name](CdvPurchase.GooglePlay.Adapter.md#name)
 - [ready](CdvPurchase.GooglePlay.Adapter.md#ready)
 - [retry](CdvPurchase.GooglePlay.Adapter.md#retry)
+- [supportsParallelLoading](CdvPurchase.GooglePlay.Adapter.md#supportsparallelloading)
 - [\_instance](CdvPurchase.GooglePlay.Adapter.md#_instance)
+- [trimProductTitles](CdvPurchase.GooglePlay.Adapter.md#trimproducttitles)
 
 ### Accessors
 
@@ -57,7 +59,7 @@ Adapter for a payment or in-app purchase platform
 
 ### constructor
 
-• **new Adapter**(`context`, `autoRefreshIntervalMillis?`)
+• **new Adapter**(`context`, `autoRefreshIntervalMillis?`): [`Adapter`](CdvPurchase.GooglePlay.Adapter.md)
 
 #### Parameters
 
@@ -65,6 +67,10 @@ Adapter for a payment or in-app purchase platform
 | :------ | :------ |
 | `context` | `AdapterContext` |
 | `autoRefreshIntervalMillis` | `number` |
+
+#### Returns
+
+[`Adapter`](CdvPurchase.GooglePlay.Adapter.md)
 
 ## Properties
 
@@ -128,15 +134,33 @@ ___
 
 ### retry
 
-• **retry**: `Retry`<`Function`\>
+• **retry**: `Retry`\<`Function`\>
 
 Used to retry failed commands
+
+___
+
+### supportsParallelLoading
+
+• **supportsParallelLoading**: `boolean` = `false`
+
+Set to true if receipts and products can be loaded in parallel
+
+#### Implementation of
+
+[Adapter](../interfaces/CdvPurchase.Adapter.md).[supportsParallelLoading](../interfaces/CdvPurchase.Adapter.md#supportsparallelloading)
 
 ___
 
 ### \_instance
 
 ▪ `Static` **\_instance**: [`Adapter`](CdvPurchase.GooglePlay.Adapter.md)
+
+___
+
+### trimProductTitles
+
+▪ `Static` **trimProductTitles**: `boolean` = `true`
 
 ## Accessors
 
@@ -152,7 +176,7 @@ Returns true on Android, the only platform supported by this adapter
 
 #### Implementation of
 
-CdvPurchase.Adapter.isSupported
+[Adapter](../interfaces/CdvPurchase.Adapter.md).[isSupported](../interfaces/CdvPurchase.Adapter.md#issupported)
 
 ___
 
@@ -168,7 +192,7 @@ List of products managed by the GooglePlay adapter
 
 #### Implementation of
 
-CdvPurchase.Adapter.products
+[Adapter](../interfaces/CdvPurchase.Adapter.md).[products](../interfaces/CdvPurchase.Adapter.md#products)
 
 ___
 
@@ -184,7 +208,7 @@ List of purchase receipts.
 
 #### Implementation of
 
-CdvPurchase.Adapter.receipts
+[Adapter](../interfaces/CdvPurchase.Adapter.md).[receipts](../interfaces/CdvPurchase.Adapter.md#receipts)
 
 ## Methods
 
@@ -233,7 +257,7 @@ ___
 
 ### finish
 
-▸ **finish**(`transaction`): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **finish**(`transaction`): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Finish a transaction.
 
@@ -248,7 +272,7 @@ For consumable, this will acknowledge and consume the purchase.
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
@@ -258,13 +282,13 @@ ___
 
 ### getPurchases
 
-▸ **getPurchases**(): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **getPurchases**(): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Refresh purchases from GooglePlay
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 ___
 
@@ -293,7 +317,7 @@ ___
 
 ### handleReceiptValidationResponse
 
-▸ **handleReceiptValidationResponse**(`receipt`, `response`): `Promise`<`void`\>
+▸ **handleReceiptValidationResponse**(`receipt`, `response`): `Promise`\<`void`\>
 
 Handle platform specific fields from receipt validation response.
 
@@ -306,7 +330,7 @@ Handle platform specific fields from receipt validation response.
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`\<`void`\>
 
 #### Implementation of
 
@@ -316,7 +340,7 @@ ___
 
 ### initialize
 
-▸ **initialize**(): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **initialize**(): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Initializes a platform adapter.
 
@@ -328,7 +352,7 @@ In other case of a potentially recoverable error, the adapter will keep retrying
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
@@ -338,7 +362,7 @@ ___
 
 ### loadProducts
 
-▸ **loadProducts**(`products`): `Promise`<([`IError`](../interfaces/CdvPurchase.IError.md) \| [`GProduct`](CdvPurchase.GooglePlay.GProduct.md))[]\>
+▸ **loadProducts**(`products`): `Promise`\<([`IError`](../interfaces/CdvPurchase.IError.md) \| [`GProduct`](CdvPurchase.GooglePlay.GProduct.md))[]\>
 
 Load product definitions from the platform.
 
@@ -350,7 +374,7 @@ Load product definitions from the platform.
 
 #### Returns
 
-`Promise`<([`IError`](../interfaces/CdvPurchase.IError.md) \| [`GProduct`](CdvPurchase.GooglePlay.GProduct.md))[]\>
+`Promise`\<([`IError`](../interfaces/CdvPurchase.IError.md) \| [`GProduct`](CdvPurchase.GooglePlay.GProduct.md))[]\>
 
 #### Implementation of
 
@@ -360,13 +384,13 @@ ___
 
 ### loadReceipts
 
-▸ **loadReceipts**(): `Promise`<[`Receipt`](CdvPurchase.Receipt.md)[]\>
+▸ **loadReceipts**(): `Promise`\<[`Receipt`](CdvPurchase.Receipt.md)[]\>
 
 Load the receipts
 
 #### Returns
 
-`Promise`<[`Receipt`](CdvPurchase.Receipt.md)[]\>
+`Promise`\<[`Receipt`](CdvPurchase.Receipt.md)[]\>
 
 #### Implementation of
 
@@ -376,13 +400,13 @@ ___
 
 ### manageBilling
 
-▸ **manageBilling**(): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **manageBilling**(): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Open the platforms' billing management interface.
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
@@ -392,13 +416,13 @@ ___
 
 ### manageSubscriptions
 
-▸ **manageSubscriptions**(): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **manageSubscriptions**(): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Open the platforms' subscription management interface.
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
@@ -478,7 +502,7 @@ ___
 
 ### order
 
-▸ **order**(`offer`, `additionalData`): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **order**(`offer`, `additionalData`): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Initializes an order.
 
@@ -491,7 +515,7 @@ Initializes an order.
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
@@ -501,7 +525,7 @@ ___
 
 ### receiptValidationBody
 
-▸ **receiptValidationBody**(`receipt`): `Promise`<`undefined` \| [`Body`](../interfaces/CdvPurchase.Validator.Request.Body.md)\>
+▸ **receiptValidationBody**(`receipt`): `Promise`\<`undefined` \| [`Body`](../interfaces/CdvPurchase.Validator.Request.Body.md)\>
 
 Prepare for receipt validation
 
@@ -513,7 +537,7 @@ Prepare for receipt validation
 
 #### Returns
 
-`Promise`<`undefined` \| [`Body`](../interfaces/CdvPurchase.Validator.Request.Body.md)\>
+`Promise`\<`undefined` \| [`Body`](../interfaces/CdvPurchase.Validator.Request.Body.md)\>
 
 #### Implementation of
 
@@ -523,7 +547,7 @@ ___
 
 ### requestPayment
 
-▸ **requestPayment**(`payment`, `additionalData?`): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`Transaction`](CdvPurchase.GooglePlay.Transaction.md)\>
+▸ **requestPayment**(`payment`, `additionalData?`): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`Transaction`](CdvPurchase.GooglePlay.Transaction.md)\>
 
 Request a payment from the user
 
@@ -536,7 +560,7 @@ Request a payment from the user
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`Transaction`](CdvPurchase.GooglePlay.Transaction.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`Transaction`](CdvPurchase.GooglePlay.Transaction.md)\>
 
 #### Implementation of
 
@@ -546,7 +570,7 @@ ___
 
 ### restorePurchases
 
-▸ **restorePurchases**(): `Promise`<`void`\>
+▸ **restorePurchases**(): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Replay the queue of transactions.
 
@@ -554,7 +578,7 @@ Might ask the user to login.
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 

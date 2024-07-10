@@ -28,8 +28,10 @@ Adapter for Apple AppStore using StoreKit version 1
 - [log](CdvPurchase.AppleAppStore.Adapter.md#log)
 - [name](CdvPurchase.AppleAppStore.Adapter.md#name)
 - [needAppReceipt](CdvPurchase.AppleAppStore.Adapter.md#needappreceipt)
+- [onRestoreCompleted](CdvPurchase.AppleAppStore.Adapter.md#onrestorecompleted)
 - [pseudoReceipt](CdvPurchase.AppleAppStore.Adapter.md#pseudoreceipt)
 - [ready](CdvPurchase.AppleAppStore.Adapter.md#ready)
+- [supportsParallelLoading](CdvPurchase.AppleAppStore.Adapter.md#supportsparallelloading)
 
 ### Accessors
 
@@ -60,7 +62,7 @@ Adapter for Apple AppStore using StoreKit version 1
 
 ### constructor
 
-• **new Adapter**(`context`, `options`)
+• **new Adapter**(`context`, `options`): [`Adapter`](CdvPurchase.AppleAppStore.Adapter.md)
 
 #### Parameters
 
@@ -68,6 +70,10 @@ Adapter for Apple AppStore using StoreKit version 1
 | :------ | :------ |
 | `context` | `AdapterContext` |
 | `options` | [`AdapterOptions`](../interfaces/CdvPurchase.AppleAppStore.AdapterOptions.md) |
+
+#### Returns
+
+[`Adapter`](CdvPurchase.AppleAppStore.Adapter.md)
 
 ## Properties
 
@@ -169,6 +175,28 @@ True when we need to validate the application receipt
 
 ___
 
+### onRestoreCompleted
+
+• `Optional` **onRestoreCompleted**: (`code`: `undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)) => `void`
+
+Callback called when the restore process is completed
+
+#### Type declaration
+
+▸ (`code`): `void`
+
+##### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `code` | `undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) |
+
+##### Returns
+
+`void`
+
+___
+
 ### pseudoReceipt
 
 • **pseudoReceipt**: [`Receipt`](CdvPurchase.Receipt.md)
@@ -189,6 +217,18 @@ The value is set by the "Adapters" class (which is responsible for initializing 
 
 [Adapter](../interfaces/CdvPurchase.Adapter.md).[ready](../interfaces/CdvPurchase.Adapter.md#ready)
 
+___
+
+### supportsParallelLoading
+
+• **supportsParallelLoading**: `boolean` = `true`
+
+Set to true if receipts and products can be loaded in parallel
+
+#### Implementation of
+
+[Adapter](../interfaces/CdvPurchase.Adapter.md).[supportsParallelLoading](../interfaces/CdvPurchase.Adapter.md#supportsparallelloading)
+
 ## Accessors
 
 ### isSupported
@@ -203,7 +243,7 @@ Returns true on iOS, the only platform supported by this adapter
 
 #### Implementation of
 
-CdvPurchase.Adapter.isSupported
+[Adapter](../interfaces/CdvPurchase.Adapter.md).[isSupported](../interfaces/CdvPurchase.Adapter.md#issupported)
 
 ___
 
@@ -219,7 +259,7 @@ List of products managed by the adapter.
 
 #### Implementation of
 
-CdvPurchase.Adapter.products
+[Adapter](../interfaces/CdvPurchase.Adapter.md).[products](../interfaces/CdvPurchase.Adapter.md#products)
 
 ___
 
@@ -235,7 +275,7 @@ List of purchase receipts.
 
 #### Implementation of
 
-CdvPurchase.Adapter.receipts
+[Adapter](../interfaces/CdvPurchase.Adapter.md).[receipts](../interfaces/CdvPurchase.Adapter.md#receipts)
 
 ## Methods
 
@@ -280,7 +320,7 @@ ___
 
 ### finish
 
-▸ **finish**(`transaction`): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **finish**(`transaction`): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Finish a transaction.
 
@@ -295,7 +335,7 @@ For consumable, this will acknowledge and consume the purchase.
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
@@ -323,7 +363,7 @@ ___
 
 ### handleReceiptValidationResponse
 
-▸ **handleReceiptValidationResponse**(`_receipt`, `response`): `Promise`<`void`\>
+▸ **handleReceiptValidationResponse**(`_receipt`, `response`): `Promise`\<`void`\>
 
 Handle platform specific fields from receipt validation response.
 
@@ -336,7 +376,7 @@ Handle platform specific fields from receipt validation response.
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`\<`void`\>
 
 #### Implementation of
 
@@ -346,7 +386,7 @@ ___
 
 ### initialize
 
-▸ **initialize**(): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **initialize**(): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Initializes a platform adapter.
 
@@ -358,7 +398,7 @@ In other case of a potentially recoverable error, the adapter will keep retrying
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
@@ -368,7 +408,7 @@ ___
 
 ### loadProducts
 
-▸ **loadProducts**(`products`): `Promise`<([`IError`](../interfaces/CdvPurchase.IError.md) \| [`Product`](CdvPurchase.Product.md))[]\>
+▸ **loadProducts**(`products`): `Promise`\<([`IError`](../interfaces/CdvPurchase.IError.md) \| [`Product`](CdvPurchase.Product.md))[]\>
 
 Load product definitions from the platform.
 
@@ -380,7 +420,7 @@ Load product definitions from the platform.
 
 #### Returns
 
-`Promise`<([`IError`](../interfaces/CdvPurchase.IError.md) \| [`Product`](CdvPurchase.Product.md))[]\>
+`Promise`\<([`IError`](../interfaces/CdvPurchase.IError.md) \| [`Product`](CdvPurchase.Product.md))[]\>
 
 #### Implementation of
 
@@ -390,13 +430,13 @@ ___
 
 ### loadReceipts
 
-▸ **loadReceipts**(): `Promise`<[`Receipt`](CdvPurchase.Receipt.md)[]\>
+▸ **loadReceipts**(): `Promise`\<[`Receipt`](CdvPurchase.Receipt.md)[]\>
 
 Load the receipts
 
 #### Returns
 
-`Promise`<[`Receipt`](CdvPurchase.Receipt.md)[]\>
+`Promise`\<[`Receipt`](CdvPurchase.Receipt.md)[]\>
 
 #### Implementation of
 
@@ -406,13 +446,13 @@ ___
 
 ### manageBilling
 
-▸ **manageBilling**(): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **manageBilling**(): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Open the platforms' billing management interface.
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
@@ -422,13 +462,13 @@ ___
 
 ### manageSubscriptions
 
-▸ **manageSubscriptions**(): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **manageSubscriptions**(): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Open the platforms' subscription management interface.
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
@@ -438,7 +478,7 @@ ___
 
 ### order
 
-▸ **order**(`offer`, `additionalData`): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+▸ **order**(`offer`, `additionalData`): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Initializes an order.
 
@@ -451,7 +491,7 @@ Initializes an order.
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
@@ -461,17 +501,17 @@ ___
 
 ### presentCodeRedemptionSheet
 
-▸ **presentCodeRedemptionSheet**(): `Promise`<`void`\>
+▸ **presentCodeRedemptionSheet**(): `Promise`\<`void`\>
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`\<`void`\>
 
 ___
 
 ### receiptValidationBody
 
-▸ **receiptValidationBody**(`receipt`): `Promise`<`undefined` \| [`Body`](../interfaces/CdvPurchase.Validator.Request.Body.md)\>
+▸ **receiptValidationBody**(`receipt`): `Promise`\<`undefined` \| [`Body`](../interfaces/CdvPurchase.Validator.Request.Body.md)\>
 
 Prepare for receipt validation
 
@@ -483,7 +523,7 @@ Prepare for receipt validation
 
 #### Returns
 
-`Promise`<`undefined` \| [`Body`](../interfaces/CdvPurchase.Validator.Request.Body.md)\>
+`Promise`\<`undefined` \| [`Body`](../interfaces/CdvPurchase.Validator.Request.Body.md)\>
 
 #### Implementation of
 
@@ -493,17 +533,17 @@ ___
 
 ### refreshReceipt
 
-▸ **refreshReceipt**(): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`ApplicationReceipt`](../interfaces/CdvPurchase.AppleAppStore.ApplicationReceipt.md)\>
+▸ **refreshReceipt**(): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`ApplicationReceipt`](../interfaces/CdvPurchase.AppleAppStore.ApplicationReceipt.md)\>
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`ApplicationReceipt`](../interfaces/CdvPurchase.AppleAppStore.ApplicationReceipt.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`ApplicationReceipt`](../interfaces/CdvPurchase.AppleAppStore.ApplicationReceipt.md)\>
 
 ___
 
 ### requestPayment
 
-▸ **requestPayment**(`payment`, `additionalData?`): `Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`Transaction`](CdvPurchase.Transaction.md)\>
+▸ **requestPayment**(`payment`, `additionalData?`): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`Transaction`](CdvPurchase.Transaction.md)\>
 
 Request a payment from the user
 
@@ -516,7 +556,7 @@ Request a payment from the user
 
 #### Returns
 
-`Promise`<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`Transaction`](CdvPurchase.Transaction.md)\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md) \| [`Transaction`](CdvPurchase.Transaction.md)\>
 
 #### Implementation of
 
@@ -526,7 +566,7 @@ ___
 
 ### restorePurchases
 
-▸ **restorePurchases**(): `Promise`<`void`\>
+▸ **restorePurchases**(): `Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 Replay the queue of transactions.
 
@@ -534,7 +574,7 @@ Might ask the user to login.
 
 #### Returns
 
-`Promise`<`void`\>
+`Promise`\<`undefined` \| [`IError`](../interfaces/CdvPurchase.IError.md)\>
 
 #### Implementation of
 
