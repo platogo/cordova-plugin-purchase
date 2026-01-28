@@ -70,7 +70,10 @@ Entry class of the plugin.
 
 • `Optional` **applicationUsername**: `string` \| () => `undefined` \| `string`
 
-Return the identifier of the user for your application
+Return the identifier of the user for your application.
+
+**Note:** Apple AppStore requires an UUIDv4 if you want it to appear as the "appAccountToken" in
+the transaction data.
 
 ___
 
@@ -563,6 +566,11 @@ ___
 
 Return true if a product is owned
 
+Important: The value will be false when the app starts and will only become
+true after purchase receipts have been loaded and validated. Without receipt validation,
+it might remain false depending on the platform, make sure to store the ownership status
+of non-consumable products in some way.
+
 #### Parameters
 
 | Name | Type | Description |
@@ -697,7 +705,12 @@ ___
 
 ▸ **when**(): [`When`](../interfaces/CdvPurchase.When.md)
 
-Setup events listener.
+Register event callbacks.
+
+Events overview:
+- `productUpdated`: Called when product metadata is loaded from the store
+- `receiptUpdated`: Called when local receipt information changes (ownership status change, for example)
+- `verified`: Called after successful receipt validation (requires a receipt validator)
 
 #### Returns
 
@@ -706,8 +719,23 @@ Setup events listener.
 **`Example`**
 
 ```ts
+// Monitor ownership with receipt validation
 store.when()
-     .productUpdated(product => updateUI(product))
      .approved(transaction => transaction.verify())
-     .verified(receipt => receipt.finish());
+     .verified(receipt => {
+         if (store.owned("my-product")) {
+             // Product is owned and verified
+         }
+     });
+```
+
+**`Example`**
+
+```ts
+// Monitor ownership without receipt validation
+store.when().receiptUpdated(receipt => {
+  if (store.owned("my-product")) {
+    // Product is owned according to local data
+  }
+});
 ```
