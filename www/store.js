@@ -5761,7 +5761,7 @@ var CdvPurchase;
             function extendAdditionalData(ad) {
                 const additionalData = ensureObject(ad === null || ad === void 0 ? void 0 : ad.googlePlay);
                 if (!additionalData.accountId && (ad === null || ad === void 0 ? void 0 : ad.applicationUsername)) {
-                    additionalData.accountId = CdvPurchase.Utils.md5(ad.applicationUsername);
+                    additionalData.accountId = ad.applicationUsername;
                 }
                 return additionalData;
             }
