@@ -130,6 +130,14 @@ namespace CdvPurchase {
         isSupported: boolean;
 
         /**
+         * Returns true if the adapter can skip the native finish method for a transaction.
+         * 
+         * Some platforms (e.g. Apple AppStore) require explicit acknowledgement of a purchase so it can be removed from
+         * the queue of pending transactions, regardless of whether the transaction is acknowledged or consumed already.
+         */
+        canSkipFinish?: boolean;
+
+        /**
          * Initializes a platform adapter.
          *
          * Will resolve when initialization is complete.
@@ -204,8 +212,34 @@ namespace CdvPurchase {
          * Might ask the user to login.
          */
         restorePurchases(): Promise<IError | undefined>;
+
+        /**
+         * Retrieve the billing country code from the platform's storefront.
+         *
+         * Returns an ISO 3166-1 alpha-2 country code (e.g., "US", "FR"),
+         * or undefined if the storefront information is not available.
+         */
+        getStorefront?(): Promise<string | undefined>;
     }
 
+    /**
+     * A storefront country code, scoped to a specific payment platform.
+     *
+     * Returned from {@link Store.getStorefront} and passed to
+     * `when().storefrontUpdated()` listeners.
+     */
+    export interface Storefront {
+        /** The platform this storefront belongs to. */
+        readonly platform: Platform;
+        /**
+         * ISO 3166-1 alpha-2 country code (e.g., "US", "FR").
+         *
+         * Undefined if the value has not been fetched yet, or if the fetch
+         * failed. Never set to a falsy value once populated — a later failed
+         * refresh will preserve the previously-known country code.
+         */
+        readonly countryCode?: string;
+    }
 
     /**
      * Data to attach to a transaction.
@@ -217,6 +251,16 @@ namespace CdvPurchase {
 
         /** The application's user identifier, will be obfuscated with md5 to fill `accountId` if necessary */
         applicationUsername?: string;
+
+        /**
+         * Quantity of items to purchase.
+         *
+         * Only supported on platforms that report the `'orderQuantity'` capability.
+         * Platforms without support will ignore this field.
+         *
+         * @see {@link Store.checkSupport}
+         */
+        quantity?: number;
 
         /** GooglePlay specific additional data */
         googlePlay?: GooglePlay.AdditionalData;
@@ -250,6 +294,9 @@ namespace CdvPurchase {
 
         /** Test platform */
         TEST = 'test',
+
+        /** Iaptic.js */
+        IAPTIC_JS = 'iaptic-js',
     }
 
     /**
@@ -257,7 +304,7 @@ namespace CdvPurchase {
      *
      * @see {@link Store.checkSupport}
      */
-    export type PlatformFunctionality = 'requestPayment' | 'order' | 'manageSubscriptions' | 'manageBilling';
+    export type PlatformFunctionality = 'requestPayment' | 'order' | 'orderQuantity' | 'manageSubscriptions' | 'manageBilling' | 'getStorefront';
 
     /**
      * Possible states of a transaction.
@@ -335,6 +382,17 @@ namespace CdvPurchase {
          * If no platforms have any receipts (user made no purchase), this will also get called.
          */
         receiptsVerified(cb: Callback<void>, callbackName?: string): When;
+
+        /**
+         * Register a function called when a platform's storefront country code changes.
+         *
+         * Fires when a platform's cached value transitions to a different non-empty
+         * string. Does not fire for no-op refreshes, failed refreshes, or transitions
+         * to undefined (the cache preserves the last-known value).
+         *
+         * @param cb - Callback invoked with the updated {@link Storefront}
+         */
+        storefrontUpdated(cb: Callback<Storefront>, callbackName?: string): When;
     }
 
     /** Whether or not the user intends to let the subscription auto-renew. */

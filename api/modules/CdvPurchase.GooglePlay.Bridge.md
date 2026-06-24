@@ -12,9 +12,12 @@
 ### Classes
 
 - [Bridge](../classes/CdvPurchase.GooglePlay.Bridge.Bridge.md)
+- [CapacitorBridge](../classes/CdvPurchase.GooglePlay.Bridge.CapacitorBridge.md)
 
 ### Interfaces
 
+- [BridgeInterface](../interfaces/CdvPurchase.GooglePlay.Bridge.BridgeInterface.md)
+- [InAppOffer](../interfaces/CdvPurchase.GooglePlay.Bridge.InAppOffer.md)
 - [InAppProduct](../interfaces/CdvPurchase.GooglePlay.Bridge.InAppProduct.md)
 - [Options](../interfaces/CdvPurchase.GooglePlay.Bridge.Options.md)
 - [PricingPhase](../interfaces/CdvPurchase.GooglePlay.Bridge.PricingPhase.md)

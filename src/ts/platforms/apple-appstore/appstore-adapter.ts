@@ -19,6 +19,7 @@ namespace CdvPurchase {
 
             /** Information about the payment discount */
             discount?: PaymentDiscount;
+
         }
 
         /**
@@ -125,7 +126,10 @@ namespace CdvPurchase {
                 });
             }
 
-            bridge: Bridge.Bridge;
+            bridge: Bridge.BridgeInterface;
+
+            /** True when the StoreKit 2 extension is active */
+            readonly useSK2: boolean;
             context: CdvPurchase.Internal.AdapterContext;
             log: Logger;
 
@@ -146,10 +150,22 @@ namespace CdvPurchase {
 
             constructor(context: CdvPurchase.Internal.AdapterContext, options: AdapterOptions) {
                 this.context = context;
-                this.bridge = new Bridge.Bridge();
                 this.log = context.log.child('AppleAppStore');
+
+                const useCapacitor = CapacitorBridge.CapacitorNativeBridge.isAvailable();
+                this.useSK2 = useCapacitor || SK2Bridge.SK2NativeBridge.isAvailable();
+                if (useCapacitor) {
+                    this.log.info('Capacitor plugin detected, using Capacitor SK2 bridge');
+                    this.bridge = new CapacitorBridge.CapacitorNativeBridge();
+                } else if (SK2Bridge.SK2NativeBridge.isAvailable()) {
+                    this.log.info('StoreKit 2 extension detected, using SK2 bridge');
+                    this.bridge = new SK2Bridge.SK2NativeBridge();
+                } else {
+                    this.bridge = new Bridge.Bridge();
+                }
+
                 this.discountEligibilityDeterminer = options.discountEligibilityDeterminer;
-                this.needAppReceipt = options.needAppReceipt ?? true;
+                this.needAppReceipt = this.useSK2 ? false : (options.needAppReceipt ?? true);
                 this.autoFinish = options.autoFinish ?? false;
                 this.pseudoReceipt = new Receipt(Platform.APPLE_APPSTORE, this.context.apiDecorators);
                 this.receiptsUpdated = Utils.createDebouncer(() => {
@@ -193,9 +209,16 @@ namespace CdvPurchase {
                 return new Promise(resolve => {
                     this.initializeAppReceipt(() => {
                         if (!this._receipt) {
-                            // this should not happen
-                            this.log.warn('Failed to load the application receipt, cannot proceed with handling the purchase');
-                            return;
+                            // Receipt failed to load — create a minimal receipt so the
+                            // transaction can still be tracked and finished.  Without this
+                            // fallback the Promise would never resolve, leaving the native
+                            // transaction unfinished (causing the purchase dialog to loop on
+                            // iOS — see #1568).
+                            this.log.warn('Application receipt unavailable, creating a fallback receipt to avoid blocking transactions');
+                            this._receipt = new SKApplicationReceipt(
+                                { appStoreReceipt: '', bundleIdentifier: '',
+                                  bundleShortVersion: '', bundleNumericVersion: 0, bundleSignature: '' },
+                                this.needAppReceipt, this.context.apiDecorators);
                         }
                         const existing = this._receipt?.transactions.find(t => t.transactionId === transactionId) as SKTransaction | undefined;
                         if (existing) {
@@ -269,11 +292,19 @@ namespace CdvPurchase {
                             this.log.info('ready');
                         },
 
-                        purchased: async (transactionIdentifier: string, productId: string, originalTransactionIdentifier?: string, transactionDate?: string, discountId?: string) => {
-                            this.log.info('purchase: id:' + transactionIdentifier + ' product:' + productId + ' originalTransaction:' + originalTransactionIdentifier + ' - date:' + transactionDate + ' - discount:' + discountId);
+                        purchased: async (transactionIdentifier: string, productId: string,
+                            originalTransactionIdentifier?: string, transactionDate?: string,
+                            discountId?: string, expirationDate?: string, jwsRepresentation?: string,
+                            quantity?: number) => {
+                            this.log.info('purchase: id:' + transactionIdentifier + ' product:' + productId +
+                                ' originalTransaction:' + originalTransactionIdentifier +
+                                ' - date:' + transactionDate + ' - discount:' + discountId +
+                                (jwsRepresentation ? ' - jws:present' : '') +
+                                (quantity && quantity > 1 ? ' - quantity:' + quantity : ''));
                             // we can add the transaction to the receipt here
                             const transaction = await this.upsertTransaction(productId, transactionIdentifier, TransactionState.APPROVED);
-                            transaction.refresh(productId, originalTransactionIdentifier, transactionDate, discountId);
+                            transaction.refresh(productId, originalTransactionIdentifier, transactionDate,
+                                discountId, expirationDate, jwsRepresentation, quantity);
                             this.removeTransactionInProgress(productId);
                             this.receiptsUpdated.call();
                             this.callPaymentMonitor('purchased');
@@ -330,9 +361,14 @@ namespace CdvPurchase {
                             this.receiptsUpdated.call();
                         },
 
-                        restored: async (transactionIdentifier: string, productId: string) => {
+                        restored: async (transactionIdentifier: string, productId: string,
+                            originalTransactionIdentifier?: string, transactionDate?: string,
+                            discountId?: string, expirationDate?: string, jwsRepresentation?: string,
+                            quantity?: number) => {
                             this.log.info('restore: ' + transactionIdentifier + ' - ' + productId);
-                            await this.upsertTransaction(productId, transactionIdentifier, TransactionState.APPROVED);
+                            const transaction = await this.upsertTransaction(productId, transactionIdentifier, TransactionState.APPROVED);
+                            transaction.refresh(productId, originalTransactionIdentifier, transactionDate,
+                                discountId, expirationDate, jwsRepresentation, quantity);
                             this.receiptsUpdated.call();
                         },
 
@@ -369,19 +405,31 @@ namespace CdvPurchase {
 
             supportsParallelLoading = true;
 
-            loadReceipts(): Promise<Receipt[]> {
+            async loadReceipts(): Promise<Receipt[]> {
+                // Wait for native pending transactions to be processed before
+                // initializing the receipt.  Previously used a fixed 300ms delay
+                // which was unreliable and could miss transactions that arrived
+                // from the native queue (see #1529).
+                //
+                // The pendingTransactionsReady Promise resolves when the native
+                // `processPendingTransactions` call returns, but the per-transaction
+                // callbacks it triggers via evalJs land asynchronously. Yield one
+                // task so those purchased/restored callbacks (and their async
+                // upsertTransaction chain) settle before we snapshot _receipt.
+                if (this.bridge.pendingTransactionsReady) {
+                    await this.bridge.pendingTransactionsReady;
+                    await new Promise<void>(r => setTimeout(r, 0));
+                }
                 return new Promise((resolve) => {
-                    setTimeout(() => {
-                        this.initializeAppReceipt(() => {
-                            this.receiptsUpdated.call();
-                            if (this._receipt) {
-                                resolve([this._receipt, this.pseudoReceipt]);
-                            }
-                            else {
-                                resolve([this.pseudoReceipt]);
-                            }
-                        });
-                    }, 300);
+                    this.initializeAppReceipt(() => {
+                        this.receiptsUpdated.call();
+                        if (this._receipt) {
+                            resolve([this._receipt, this.pseudoReceipt]);
+                        }
+                        else {
+                            resolve([this.pseudoReceipt]);
+                        }
+                    });
                 });
             }
 
@@ -427,12 +475,24 @@ namespace CdvPurchase {
                     });
                 }
                 if (!nativeData?.appStoreReceipt) {
+                    if (this.useSK2) {
+                        // SK2 doesn't use monolithic receipts — create receipt with empty data
+                        this.log.info('SK2 mode: no appStoreReceipt (expected), creating empty receipt');
+                        this._receipt = new SKApplicationReceipt(
+                            nativeData || { appStoreReceipt: '', bundleIdentifier: '',
+                                bundleShortVersion: '', bundleNumericVersion: 0, bundleSignature: '' },
+                            this.needAppReceipt, this.context.apiDecorators);
+                        this._appStoreReceiptLoading = false;
+                        callCallbacks(undefined);
+                        return;
+                    }
                     this.log.warn('no appStoreReceipt');
                     this._appStoreReceiptLoading = false;
                     callCallbacks(appStoreError(ErrorCode.REFRESH, 'No appStoreReceipt', null));
                     return;
                 }
                 this._receipt = new SKApplicationReceipt(nativeData, this.needAppReceipt, this.context.apiDecorators);
+                this._appStoreReceiptLoading = false;
                 callCallbacks(undefined);
             }
 
@@ -483,47 +543,50 @@ namespace CdvPurchase {
 
             private async loadEligibility(validProducts: Bridge.ValidProduct[]): Promise<Internal.DiscountEligibilities> {
                 this.log.debug('load eligibility: ' + JSON.stringify(validProducts));
-                if (!this.discountEligibilityDeterminer) {
-                    this.log.debug('No discount eligibility determiner, skipping...');
+
+                // Collect eligibility requests alongside native-provided answers (from
+                // StoreKit 2's isEligibleForIntroOffer, when available).
+                const { requests, nativeAnswers } = Internal.collectEligibilityRequests(validProducts);
+
+                if (requests.length === 0) {
                     return new Internal.DiscountEligibilities([], []);
                 }
 
-                const eligibilityRequests: DiscountEligibilityRequest[] = [];
-                validProducts.forEach(valid => {
-                    valid.discounts?.forEach(discount => {
-                        eligibilityRequests.push({
-                            productId: valid.id,
-                            discountId: discount.id,
-                            discountType: discount.type,
-                        });
-                    });
-                    if ((valid.discounts?.length ?? 0) === 0 && valid.introPrice) {
-                        // sometime apple returns the discounts in the deprecated "introductory" info
-                        // we create a special "discount" with the id "intro" to check for eligibility.
-                        eligibilityRequests.push({
-                            productId: valid.id,
-                            discountId: 'intro',
-                            discountType: 'Introductory',
-                        });
-                    }
-                });
+                // Fast path — if every eligibility answer came from native, we can skip
+                // the receipt fetch and the determiner entirely. This is the common case
+                // for StoreKit 2 where the app store receipt is always empty.
+                const allNative = nativeAnswers.every(a => a !== undefined);
+                if (allNative) {
+                    this.log.debug('native eligibility answers cover all requests, skipping determiner.');
+                    return new Internal.DiscountEligibilities(requests, nativeAnswers as boolean[]);
+                }
 
-                if (eligibilityRequests.length > 0) {
-                    const applicationReceipt = await this.loadAppStoreReceipt();
-                    if (!applicationReceipt || !applicationReceipt.appStoreReceipt) {
-                        this.log.debug('no receipt, assuming introductory price are available.');
-                        return new Internal.DiscountEligibilities(eligibilityRequests, eligibilityRequests.map(r => r.discountType === "Introductory"));
-                    }
-                    else {
-                        this.log.debug('calling discount eligibility determiner.');
-                        const response = await this.callDiscountEligibilityDeterminer(applicationReceipt, eligibilityRequests);
-                        this.log.debug('response: ' + JSON.stringify(response));
-                        return new Internal.DiscountEligibilities(eligibilityRequests, response);
-                    }
+                // Otherwise fall back to the receipt + determiner path, then overlay any
+                // native answers we do have (native wins on conflict — it's authoritative).
+                if (!this.discountEligibilityDeterminer) {
+                    this.log.debug('No discount eligibility determiner; using native answers only where available.');
+                    const defaultForMissing = requests.map(r => r.discountType === 'Introductory');
+                    return new Internal.DiscountEligibilities(
+                        requests,
+                        Internal.mergeNativeEligibility(defaultForMissing, nativeAnswers),
+                    );
+                }
+
+                const applicationReceipt = await this.loadAppStoreReceipt();
+                let response: boolean[];
+                if (!applicationReceipt || !applicationReceipt.appStoreReceipt) {
+                    this.log.debug('no receipt, assuming introductory price are available.');
+                    response = requests.map(r => r.discountType === 'Introductory');
                 }
                 else {
-                    return new Internal.DiscountEligibilities([], []);
+                    this.log.debug('calling discount eligibility determiner.');
+                    response = await this.callDiscountEligibilityDeterminer(applicationReceipt, requests);
+                    this.log.debug('response: ' + JSON.stringify(response));
                 }
+                return new Internal.DiscountEligibilities(
+                    requests,
+                    Internal.mergeNativeEligibility(response, nativeAnswers),
+                );
             }
 
             private callDiscountEligibilityDeterminer(applicationReceipt: ApplicationReceipt, eligibilityRequests: DiscountEligibilityRequest[]): Promise<boolean[]> {
@@ -586,6 +649,10 @@ namespace CdvPurchase {
                         resolve(result);
                     }
                     this.log.info('order');
+                    const quantity = additionalData?.quantity ?? 1;
+                    if (quantity < 1 || quantity > 10 || !Number.isInteger(quantity)) {
+                        return callResolve(appStoreError(ErrorCode.PURCHASE, 'Invalid quantity: must be an integer between 1 and 10', offer.productId));
+                    }
                     const discountId = offer.id !== DEFAULT_OFFER_ID ? offer.id : undefined;
                     const discount = additionalData?.appStore?.discount;
                     if (discountId && !discount) {
@@ -625,7 +692,7 @@ namespace CdvPurchase {
                     // When we switch AppStore user, the cached receipt isn't from the new user.
                     // so after a purchase, we want to make sure we're using the receipt from the logged in user.
                     this.forceReceiptReload = true;
-                    this.bridge.purchase(offer.productId, 1, this.context.getApplicationUsername(), discount, success, error);
+                    this.bridge.purchase(offer.productId, quantity, this.context.getApplicationUsername(), discount, success, error);
                 });
             }
 
@@ -635,19 +702,24 @@ namespace CdvPurchase {
                     if (transaction.transactionId === APPLICATION_VIRTUAL_TRANSACTION_ID || transaction.transactionId === virtualTransactionId(transaction.products[0].id)) {
                         // this is a virtual transaction, nothing to do.
                         transaction.state = TransactionState.FINISHED;
-                        this.context.listener.receiptsUpdated(Platform.APPLE_APPSTORE, [transaction.parentReceipt]);
+                        this.receiptsUpdated.call();
                         return resolve(undefined);
                     }
 
+                    const wasAlreadyFinished = transaction.state === TransactionState.FINISHED;
+
                     const success = () => {
                         transaction.state = TransactionState.FINISHED;
-                        this.context.listener.receiptsUpdated(Platform.APPLE_APPSTORE, [transaction.parentReceipt]);
+                        if (!wasAlreadyFinished) {
+                            this.receiptsUpdated.call();
+                        }
                         resolve(undefined);
                     }
                     const error = (msg: string) => {
                         if (msg?.includes('[#CdvPurchase:100]')) {
-                            // already finished
-                            success();
+                            // already finished at the native level
+                            transaction.state = TransactionState.FINISHED;
+                            resolve(undefined);
                         }
                         else {
                             resolve(appStoreError(ErrorCode.FINISH, 'Failed to finish transaction', transaction.products[0]?.id ?? null));
@@ -683,7 +755,8 @@ namespace CdvPurchase {
                         this.prepareReceipt(nativeData);
                     }
                 }
-                if (!skReceipt.nativeData.appStoreReceipt) {
+                // SK2 doesn't use monolithic receipts — skip the appStoreReceipt check
+                if (!this.useSK2 && !skReceipt.nativeData.appStoreReceipt) {
                     this.log.info('Cannot prepare the receipt validation body, because appStoreReceipt is missing. Refreshing...');
                     const result = await this.refreshReceipt();
                     if (!result || 'isError' in result) {
@@ -695,16 +768,39 @@ namespace CdvPurchase {
                     applicationReceipt = result;
                 }
                 const transaction = skReceipt.transactions.slice(-1)[0] as (SKTransaction | undefined);
+                const products = Utils.objectValues(this.validProducts).map(vp =>
+                    new SKProduct(vp, vp, this.context.apiDecorators, { isEligible: () => true }));
+
+                // SK2 uses a completely different transaction type ('apple-sk2') with JWS
+                // SK1 uses 'ios-appstore' with the monolithic appStoreReceipt
+                if (this.useSK2) {
+                    if (!transaction?.jwsRepresentation) {
+                        this.log.warn('SK2 mode but no JWS on transaction, skipping validation');
+                        return undefined;
+                    }
+                    return {
+                        id: applicationReceipt.bundleIdentifier,
+                        type: ProductType.APPLICATION,
+                        products,
+                        transaction: {
+                            type: 'apple-sk2' as const,
+                            id: transaction?.products?.[0]?.id,
+                            jwsRepresentation: transaction.jwsRepresentation,
+                        },
+                    };
+                }
+
+                const txBody = {
+                    type: 'ios-appstore' as const,
+                    id: transaction?.transactionId,
+                    appStoreReceipt: applicationReceipt.appStoreReceipt,
+                };
+
                 return {
                     id: applicationReceipt.bundleIdentifier,
                     type: ProductType.APPLICATION,
-                    // send all products and offers so validator get pricing information
-                    products: Utils.objectValues(this.validProducts).map(vp => new SKProduct(vp, vp, this.context.apiDecorators, { isEligible: () => true })),
-                    transaction: {
-                        type: 'ios-appstore',
-                        id: transaction?.transactionId,
-                        appStoreReceipt: applicationReceipt.appStoreReceipt,
-                    }
+                    products,
+                    transaction: txBody,
                 }
             }
 
@@ -713,7 +809,8 @@ namespace CdvPurchase {
                 let localReceiptUpdated = false;
                 if (response.ok) {
                     const vTransaction = response.data?.transaction;
-                    if (vTransaction?.type === 'ios-appstore' && 'original_application_version' in vTransaction) {
+                    const isApple = vTransaction?.type === 'ios-appstore' || vTransaction?.type === 'apple-sk2';
+                    if (isApple && vTransaction && 'original_application_version' in vTransaction) {
                         this._receipt?.transactions.forEach(t => {
                             if (t.transactionId === APPLICATION_VIRTUAL_TRANSACTION_ID) {
                                 if (vTransaction.original_purchase_date_ms) {
@@ -744,7 +841,7 @@ namespace CdvPurchase {
             checkSupport(functionality: PlatformFunctionality): boolean {
                 if (functionality === 'order') return this._canMakePayments;
                 const supported: PlatformFunctionality[] = [
-                    'order', 'manageBilling', 'manageSubscriptions'
+                    'order', 'orderQuantity', 'manageBilling', 'manageSubscriptions', 'getStorefront'
                 ];
                 return supported.indexOf(functionality) >= 0;
             }
@@ -769,6 +866,80 @@ namespace CdvPurchase {
                     this.bridge.presentCodeRedemptionSheet(resolve);
                 });
             }
+
+            async getStorefront(): Promise<string | undefined> {
+                if (!this.bridge.getStorefront) return undefined;
+                const countryCode = await this.bridge.getStorefront();
+                if (!countryCode) return undefined;
+                // SKStorefront.countryCode typically returns ISO 3166-1 alpha-3 (e.g., "USA").
+                // The fallback `|| countryCode` handles cases where Apple returns alpha-2 directly
+                // or uses a non-standard code (e.g., territories not in ISO 3166-1).
+                return isoAlpha3ToAlpha2(countryCode) || countryCode;
+            }
+        }
+
+        /**
+         * Convert ISO 3166-1 alpha-3 country code to alpha-2.
+         *
+         * Apple's SKStorefront.countryCode returns alpha-3 codes (e.g., "USA").
+         * This function converts them to the more common alpha-2 format (e.g., "US")
+         * for consistency with Google Play which already returns alpha-2.
+         */
+        const ISO_ALPHA3_TO_ALPHA2: { [key: string]: string } = {
+            AFG: 'AF', ALB: 'AL', DZA: 'DZ', ASM: 'AS', AND: 'AD',
+            AGO: 'AO', AIA: 'AI', ATA: 'AQ', ATG: 'AG', ARG: 'AR',
+            ARM: 'AM', ABW: 'AW', AUS: 'AU', AUT: 'AT', AZE: 'AZ',
+            BHS: 'BS', BHR: 'BH', BGD: 'BD', BRB: 'BB', BLR: 'BY',
+            BEL: 'BE', BLZ: 'BZ', BEN: 'BJ', BMU: 'BM', BTN: 'BT',
+            BOL: 'BO', BES: 'BQ', BIH: 'BA', BWA: 'BW', BVT: 'BV',
+            BRA: 'BR', IOT: 'IO', BRN: 'BN', BGR: 'BG', BFA: 'BF',
+            BDI: 'BI', CPV: 'CV', KHM: 'KH', CMR: 'CM', CAN: 'CA',
+            CYM: 'KY', CAF: 'CF', TCD: 'TD', CHL: 'CL', CHN: 'CN',
+            CXR: 'CX', CCK: 'CC', COL: 'CO', COM: 'KM', COG: 'CG',
+            COD: 'CD', COK: 'CK', CRI: 'CR', CIV: 'CI', HRV: 'HR',
+            CUB: 'CU', CUW: 'CW', CYP: 'CY', CZE: 'CZ', DNK: 'DK',
+            DJI: 'DJ', DMA: 'DM', DOM: 'DO', ECU: 'EC', EGY: 'EG',
+            SLV: 'SV', GNQ: 'GQ', ERI: 'ER', EST: 'EE', SWZ: 'SZ',
+            ETH: 'ET', FLK: 'FK', FRO: 'FO', FJI: 'FJ', FIN: 'FI',
+            FRA: 'FR', GUF: 'GF', PYF: 'PF', ATF: 'TF', GAB: 'GA',
+            GMB: 'GM', GEO: 'GE', DEU: 'DE', GHA: 'GH', GIB: 'GI',
+            GRC: 'GR', GRL: 'GL', GRD: 'GD', GLP: 'GP', GUM: 'GU',
+            GTM: 'GT', GGY: 'GG', GIN: 'GN', GNB: 'GW', GUY: 'GY',
+            HTI: 'HT', HMD: 'HM', VAT: 'VA', HND: 'HN', HKG: 'HK',
+            HUN: 'HU', ISL: 'IS', IND: 'IN', IDN: 'ID', IRN: 'IR',
+            IRQ: 'IQ', IRL: 'IE', IMN: 'IM', ISR: 'IL', ITA: 'IT',
+            JAM: 'JM', JPN: 'JP', JEY: 'JE', JOR: 'JO', KAZ: 'KZ',
+            KEN: 'KE', KIR: 'KI', PRK: 'KP', KOR: 'KR', KWT: 'KW',
+            KGZ: 'KG', LAO: 'LA', LVA: 'LV', LBN: 'LB', LSO: 'LS',
+            LBR: 'LR', LBY: 'LY', LIE: 'LI', LTU: 'LT', LUX: 'LU',
+            MAC: 'MO', MDG: 'MG', MWI: 'MW', MYS: 'MY', MDV: 'MV',
+            MLI: 'ML', MLT: 'MT', MHL: 'MH', MTQ: 'MQ', MRT: 'MR',
+            MUS: 'MU', MYT: 'YT', MEX: 'MX', FSM: 'FM', MDA: 'MD',
+            MCO: 'MC', MNG: 'MN', MNE: 'ME', MSR: 'MS', MAR: 'MA',
+            MOZ: 'MZ', MMR: 'MM', NAM: 'NA', NRU: 'NR', NPL: 'NP',
+            NLD: 'NL', NCL: 'NC', NZL: 'NZ', NIC: 'NI', NER: 'NE',
+            NGA: 'NG', NIU: 'NU', NFK: 'NF', MKD: 'MK', MNP: 'MP',
+            NOR: 'NO', OMN: 'OM', PAK: 'PK', PLW: 'PW', PSE: 'PS',
+            PAN: 'PA', PNG: 'PG', PRY: 'PY', PER: 'PE', PHL: 'PH',
+            PCN: 'PN', POL: 'PL', PRT: 'PT', PRI: 'PR', QAT: 'QA',
+            REU: 'RE', ROU: 'RO', RUS: 'RU', RWA: 'RW', BLM: 'BL',
+            SHN: 'SH', KNA: 'KN', LCA: 'LC', MAF: 'MF', SPM: 'PM',
+            VCT: 'VC', WSM: 'WS', SMR: 'SM', STP: 'ST', SAU: 'SA',
+            SEN: 'SN', SRB: 'RS', SYC: 'SC', SLE: 'SL', SGP: 'SG',
+            SXM: 'SX', SVK: 'SK', SVN: 'SI', SLB: 'SB', SOM: 'SO',
+            ZAF: 'ZA', SGS: 'GS', SSD: 'SS', ESP: 'ES', LKA: 'LK',
+            SDN: 'SD', SUR: 'SR', SJM: 'SJ', SWE: 'SE', CHE: 'CH',
+            SYR: 'SY', TWN: 'TW', TJK: 'TJ', TZA: 'TZ', THA: 'TH',
+            TLS: 'TL', TGO: 'TG', TKL: 'TK', TON: 'TO', TTO: 'TT',
+            TUN: 'TN', TUR: 'TR', TKM: 'TM', TCA: 'TC', TUV: 'TV',
+            UGA: 'UG', UKR: 'UA', ARE: 'AE', GBR: 'GB', USA: 'US',
+            UMI: 'UM', URY: 'UY', UZB: 'UZ', VUT: 'VU', VEN: 'VE',
+            VNM: 'VN', VGB: 'VG', VIR: 'VI', WLF: 'WF', ESH: 'EH',
+            YEM: 'YE', ZMB: 'ZM', ZWE: 'ZW',
+        };
+
+        function isoAlpha3ToAlpha2(alpha3: string): string | undefined {
+            return ISO_ALPHA3_TO_ALPHA2[alpha3.toUpperCase()];
         }
 
         function appStoreError(code: ErrorCode, message: string, productId: string | null) {

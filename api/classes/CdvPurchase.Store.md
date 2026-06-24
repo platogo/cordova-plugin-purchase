@@ -39,6 +39,7 @@ Entry class of the plugin.
 - [get](CdvPurchase.Store.md#get)
 - [getAdapter](CdvPurchase.Store.md#getadapter)
 - [getApplicationUsername](CdvPurchase.Store.md#getapplicationusername)
+- [getStorefront](CdvPurchase.Store.md#getstorefront)
 - [initialize](CdvPurchase.Store.md#initialize)
 - [manageBilling](CdvPurchase.Store.md#managebilling)
 - [manageSubscriptions](CdvPurchase.Store.md#managesubscriptions)
@@ -411,6 +412,42 @@ Get the application username as a string by either calling or returning [Store.a
 
 ___
 
+### getStorefront
+
+▸ **getStorefront**(`platform?`): `undefined` \| [`Storefront`](../interfaces/CdvPurchase.Storefront.md)
+
+Retrieve the billing country code from the platform's storefront.
+
+Returns a `Storefront` object with the platform and its ISO 3166-1
+alpha-2 country code (e.g., "US", "FR"). The country code may be
+undefined if the underlying fetch has not yet completed or failed —
+the platform is still reported. Returns `undefined` only when no
+matching adapter is ready.
+
+The cache is populated before the `storeReady` event fires (with a
+best-effort timeout), and refreshed after orders and `restorePurchases()`.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `platform?` | [`Platform`](../enums/CdvPurchase.Platform.md) | Optional platform. If omitted, returns the first cached non-empty storefront, or a `{ platform, countryCode: undefined }` object for the first ready adapter. |
+
+#### Returns
+
+`undefined` \| [`Storefront`](../interfaces/CdvPurchase.Storefront.md)
+
+**`Example`**
+
+```ts
+const storefront = store.getStorefront();
+if (storefront?.countryCode) {
+    console.log(`Billing country: ${storefront.countryCode}`);
+}
+```
+
+___
+
 ### initialize
 
 ▸ **initialize**(`platforms?`): `Promise`\<[`IError`](../interfaces/CdvPurchase.IError.md)[]\>
@@ -627,7 +664,7 @@ Register a product.
 
 | Name | Type |
 | :------ | :------ |
-| `product` | [`IRegisterProduct`](../interfaces/CdvPurchase.IRegisterProduct.md) \| [`IRegisterProduct`](../interfaces/CdvPurchase.IRegisterProduct.md)[] |
+| `product` | [`IRegisterProduct`](../interfaces/CdvPurchase.IRegisterProduct.md) \| [`IRegisterTestProduct`](../modules/CdvPurchase.Test.md#iregistertestproduct) \| ([`IRegisterProduct`](../interfaces/CdvPurchase.IRegisterProduct.md) \| [`IRegisterTestProduct`](../modules/CdvPurchase.Test.md#iregistertestproduct))[] |
 
 #### Returns
 
@@ -649,6 +686,20 @@ store.register([{
       type: ProductType.CONSUMABLE,
       platform: Platform.BRAINTREE,
   }]);
+
+// Can also be used in development to register test products
+store.register([{
+  id: 'my-custom-product',
+  type: CdvPurchase.ProductType.CONSUMABLE,
+  platform: CdvPurchase.Platform.TEST,
+  title: '...',
+  description: 'A custom test consumable product',
+  pricing: {
+    price: '$2.99',
+    currency: 'USD',
+    priceMicros: 2990000
+  }
+}]);
 ```
 
 ___

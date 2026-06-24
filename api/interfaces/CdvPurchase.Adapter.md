@@ -9,6 +9,7 @@ Adapter for a payment or in-app purchase platform
 - [`Adapter`](../classes/CdvPurchase.AppleAppStore.Adapter.md)
 - [`Adapter`](../classes/CdvPurchase.Braintree.Adapter.md)
 - [`Adapter`](../classes/CdvPurchase.GooglePlay.Adapter.md)
+- [`Adapter`](../classes/CdvPurchase.IapticJS.Adapter.md)
 - [`Adapter`](../classes/CdvPurchase.Test.Adapter.md)
 - [`Adapter`](../classes/CdvPurchase.WindowsStore.Adapter.md)
 
@@ -16,6 +17,7 @@ Adapter for a payment or in-app purchase platform
 
 ### Properties
 
+- [canSkipFinish](CdvPurchase.Adapter.md#canskipfinish)
 - [id](CdvPurchase.Adapter.md#id)
 - [isSupported](CdvPurchase.Adapter.md#issupported)
 - [name](CdvPurchase.Adapter.md#name)
@@ -28,6 +30,7 @@ Adapter for a payment or in-app purchase platform
 
 - [checkSupport](CdvPurchase.Adapter.md#checksupport)
 - [finish](CdvPurchase.Adapter.md#finish)
+- [getStorefront](CdvPurchase.Adapter.md#getstorefront)
 - [handleReceiptValidationResponse](CdvPurchase.Adapter.md#handlereceiptvalidationresponse)
 - [initialize](CdvPurchase.Adapter.md#initialize)
 - [loadProducts](CdvPurchase.Adapter.md#loadproducts)
@@ -40,6 +43,17 @@ Adapter for a payment or in-app purchase platform
 - [restorePurchases](CdvPurchase.Adapter.md#restorepurchases)
 
 ## Properties
+
+### canSkipFinish
+
+• `Optional` **canSkipFinish**: `boolean`
+
+Returns true if the adapter can skip the native finish method for a transaction.
+
+Some platforms (e.g. Apple AppStore) require explicit acknowledgement of a purchase so it can be removed from
+the queue of pending transactions, regardless of whether the transaction is acknowledged or consumed already.
+
+___
 
 ### id
 
@@ -135,6 +149,21 @@ For consumable, this will acknowledge and consume the purchase.
 #### Returns
 
 `Promise`\<`undefined` \| [`IError`](CdvPurchase.IError.md)\>
+
+___
+
+### getStorefront
+
+▸ **getStorefront**(): `Promise`\<`undefined` \| `string`\>
+
+Retrieve the billing country code from the platform's storefront.
+
+Returns an ISO 3166-1 alpha-2 country code (e.g., "US", "FR"),
+or undefined if the storefront information is not available.
+
+#### Returns
+
+`Promise`\<`undefined` \| `string`\>
 
 ___
 

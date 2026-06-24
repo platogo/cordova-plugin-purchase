@@ -33,6 +33,7 @@ Adapter for Apple AppStore using StoreKit version 1
 - [ready](CdvPurchase.AppleAppStore.Adapter.md#ready)
 - [receiptsUpdated](CdvPurchase.AppleAppStore.Adapter.md#receiptsupdated)
 - [supportsParallelLoading](CdvPurchase.AppleAppStore.Adapter.md#supportsparallelloading)
+- [useSK2](CdvPurchase.AppleAppStore.Adapter.md#usesk2)
 
 ### Accessors
 
@@ -46,6 +47,7 @@ Adapter for Apple AppStore using StoreKit version 1
 - [checkSupport](CdvPurchase.AppleAppStore.Adapter.md#checksupport)
 - [finish](CdvPurchase.AppleAppStore.Adapter.md#finish)
 - [getProduct](CdvPurchase.AppleAppStore.Adapter.md#getproduct)
+- [getStorefront](CdvPurchase.AppleAppStore.Adapter.md#getstorefront)
 - [handleReceiptValidationResponse](CdvPurchase.AppleAppStore.Adapter.md#handlereceiptvalidationresponse)
 - [initialize](CdvPurchase.AppleAppStore.Adapter.md#initialize)
 - [loadProducts](CdvPurchase.AppleAppStore.Adapter.md#loadproducts)
@@ -110,7 +112,7 @@ ___
 
 ### bridge
 
-• **bridge**: [`Bridge`](CdvPurchase.AppleAppStore.Bridge.Bridge.md)
+• **bridge**: [`BridgeInterface`](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md)
 
 ___
 
@@ -237,6 +239,14 @@ Set to true if receipts and products can be loaded in parallel
 #### Implementation of
 
 [Adapter](../interfaces/CdvPurchase.Adapter.md).[supportsParallelLoading](../interfaces/CdvPurchase.Adapter.md#supportsparallelloading)
+
+___
+
+### useSK2
+
+• `Readonly` **useSK2**: `boolean`
+
+True when the StoreKit 2 extension is active
 
 ## Accessors
 
@@ -367,6 +377,25 @@ Find a given product from ID
 #### Returns
 
 `undefined` \| [`SKProduct`](CdvPurchase.AppleAppStore.SKProduct.md)
+
+___
+
+### getStorefront
+
+▸ **getStorefront**(): `Promise`\<`undefined` \| `string`\>
+
+Retrieve the billing country code from the platform's storefront.
+
+Returns an ISO 3166-1 alpha-2 country code (e.g., "US", "FR"),
+or undefined if the storefront information is not available.
+
+#### Returns
+
+`Promise`\<`undefined` \| `string`\>
+
+#### Implementation of
+
+[Adapter](../interfaces/CdvPurchase.Adapter.md).[getStorefront](../interfaces/CdvPurchase.Adapter.md#getstorefront)
 
 ___
 

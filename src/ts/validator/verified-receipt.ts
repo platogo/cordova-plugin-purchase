@@ -120,6 +120,12 @@ namespace CdvPurchase {
         /** True when a subscription is expired. */
         isExpired?: boolean;
 
+        /** True when a purchase has been acknowledged to the platform. */
+        isAcknowledged?: boolean;
+
+        /** True when a purchase has been consumed (for consumable products). */
+        isConsumed?: boolean;
+
         /** Renewal intent. */
         renewalIntent?: string;
 
@@ -148,5 +154,13 @@ namespace CdvPurchase {
 
         /** Last time a subscription was renewed. */
         lastRenewalDate?: number;
+
+        /**
+         * Quantity of items purchased in a single transaction.
+         *
+         * For consumable products, this value represents the number of items purchased.
+         * For non-consumable products and subscriptions, this value is always 1.
+         */
+        quantity?: number;
     }
 }

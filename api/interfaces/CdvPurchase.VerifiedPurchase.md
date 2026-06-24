@@ -12,7 +12,9 @@ A purchase object returned by the receipt validator
 - [discountId](CdvPurchase.VerifiedPurchase.md#discountid)
 - [expiryDate](CdvPurchase.VerifiedPurchase.md#expirydate)
 - [id](CdvPurchase.VerifiedPurchase.md#id)
+- [isAcknowledged](CdvPurchase.VerifiedPurchase.md#isacknowledged)
 - [isBillingRetryPeriod](CdvPurchase.VerifiedPurchase.md#isbillingretryperiod)
+- [isConsumed](CdvPurchase.VerifiedPurchase.md#isconsumed)
 - [isExpired](CdvPurchase.VerifiedPurchase.md#isexpired)
 - [isIntroPeriod](CdvPurchase.VerifiedPurchase.md#isintroperiod)
 - [isTrialPeriod](CdvPurchase.VerifiedPurchase.md#istrialperiod)
@@ -21,6 +23,7 @@ A purchase object returned by the receipt validator
 - [priceConsentStatus](CdvPurchase.VerifiedPurchase.md#priceconsentstatus)
 - [purchaseDate](CdvPurchase.VerifiedPurchase.md#purchasedate)
 - [purchaseId](CdvPurchase.VerifiedPurchase.md#purchaseid)
+- [quantity](CdvPurchase.VerifiedPurchase.md#quantity)
 - [renewalIntent](CdvPurchase.VerifiedPurchase.md#renewalintent)
 - [renewalIntentChangeDate](CdvPurchase.VerifiedPurchase.md#renewalintentchangedate)
 - [transactionId](CdvPurchase.VerifiedPurchase.md#transactionid)
@@ -61,11 +64,27 @@ Product identifier
 
 ___
 
+### isAcknowledged
+
+• `Optional` **isAcknowledged**: `boolean`
+
+True when a purchase has been acknowledged to the platform.
+
+___
+
 ### isBillingRetryPeriod
 
 • `Optional` **isBillingRetryPeriod**: `boolean`
 
 True when a subscription a subscription is in the grace period after a failed attempt to collect payment
+
+___
+
+### isConsumed
+
+• `Optional` **isConsumed**: `boolean`
+
+True when a purchase has been consumed (for consumable products).
 
 ___
 
@@ -130,6 +149,17 @@ ___
 • `Optional` **purchaseId**: `string`
 
 Purchase identifier (optional)
+
+___
+
+### quantity
+
+• `Optional` **quantity**: `number`
+
+Quantity of items purchased in a single transaction.
+
+For consumable products, this value represents the number of items purchased.
+For non-consumable products and subscriptions, this value is always 1.
 
 ___
 

@@ -1,12 +1,213 @@
 # Release Notes - Cordova Plugin Purchase
 
+## 13.15
+
+### 13.15.4
+
+#### (ios) Honor StoreKit 2 `isEligibleForIntroOffer` for intro price eligibility
+
+Under StoreKit 2, the app store receipt is always empty — so the adapter's eligibility
+path was short-circuiting and reporting every user as eligible for the introductory
+price, even after they had already redeemed the free trial ([#1694](https://github.com/j3k0/cordova-plugin-purchase/issues/1694)). The native iOS plugin
+(Capacitor and the StoreKit 2 Plugin) now surfaces `Product.SubscriptionInfo.isEligibleForIntroOffer`
+on each loaded product, and the adapter seeds that authoritative answer into the
+eligibility response. When the native answer is available, the receipt-based
+`appStoreDiscountEligibilityDeterminer` is skipped entirely; when only some answers
+are available (e.g. promotional offers), the native answer overlays the determiner's
+response (native wins).
+
+Requires the **StoreKit 2 Plugin** v1.0.5+ on Cordova, or the updated Capacitor plugin
+bundled in this release. Older native builds that don't surface `introPriceEligible`
+continue to work unchanged — eligibility falls back to the existing determiner path.
+
+#### (capacitor) Export `package.json` for Capacitor CLI plugin discovery
+
+`capacitor-plugin-cdv-purchase` now exports `./package.json` so `npx cap sync` can resolve the plugin manifest under modern package-exports resolution. Without this entry, Capacitor 7+ projects could fail to discover the plugin during sync. Contributed by @kstruempf in [#1696](https://github.com/j3k0/cordova-plugin-purchase/pull/1696).
+
+### 13.15.3
+
+#### (android) Harden purchase serialization against null AccountIdentifiers
+
+Google's Play Billing Library declares `Purchase.getAccountIdentifiers()` as `@Nullable`, but the Cordova Android bridge was dereferencing it unconditionally in `toJSON()`. When Play Store returns `null` for a purchase made without `setObfuscatedAccountId()`, this throws an NPE that silently breaks the purchase-to-JS pipeline — matching the "Product Owned never fires" symptom reported in [#1690](https://github.com/j3k0/cordova-plugin-purchase/issues/1690). The Cordova plugin now matches the Capacitor plugin's existing null-guard.
+
+Additional Android hardening shipped alongside:
+
+- **Wider exception handling in `onPurchasesUpdated`** (Cordova and Capacitor). The catch block now handles `Exception` instead of only `JSONException`, so any unexpected serialization failure during a live purchase is surfaced through the normal error path instead of crashing the purchase listener.
+- **(capacitor) `enableAutoServiceReconnection()` on the BillingClient.** The Capacitor Android plugin now enables PBL 8's automatic reconnection when Google Play Services disconnects (parity with the Cordova plugin).
+- **(cordova) Deduplicate `mPurchases` in `onQueryPurchasesFinished`.** The internal purchase list is now cleared before re-populating, so repeated `store.restorePurchases()` or `queryPurchases()` calls don't accumulate stale duplicates.
+
+#### (ios) Prevent sandbox dialog loop and stale ownership at app start
+
+Contributed by @giacomoballi in [#1689](https://github.com/j3k0/cordova-plugin-purchase/pull/1689):
+
+- **Sandbox dialog loop when the app receipt fails to load.** `upsertTransaction` now falls back to a synthetic `SKApplicationReceipt` so the promise resolves and the native transaction gets finished instead of looping the sandbox sign-in dialog indefinitely ([#1568](https://github.com/j3k0/cordova-plugin-purchase/issues/1568)).
+- **Stale ownership at startup.** `loadReceipts()` now awaits `bridge.pendingTransactionsReady` (plus one task yield so async `upsertTransaction` chains can settle) instead of relying on a fixed 300 ms timeout. Transactions drained from the native queue are now guaranteed to be present in the returned receipt ([#1529](https://github.com/j3k0/cordova-plugin-purchase/issues/1529), [#1363](https://github.com/j3k0/cordova-plugin-purchase/issues/1363)).
+- `initializeAppReceipt` now clears `_appStoreReceiptLoading` on the success path so subsequent loads are not blocked.
+
+### 13.15.2
+
+#### (capacitor) Capacitor 7 and 8 compatibility
+
+`capacitor-plugin-cdv-purchase` now installs cleanly on Capacitor 7 and 8 projects. The `@capacitor/core` peer dependency has been widened from `^6.0.0` to `^6.0.0 || ^7.0.0 || ^8.0.0`, and the SPM manifest (`Package.swift`) plus the root podspec (`CapacitorPluginCdvPurchase.podspec`) are now included in the published npm tarball — previously they were omitted, so Capacitor 8 (SPM) and Capacitor 6/7 (CocoaPods) both failed during `npx cap sync ios`. See [#1692](https://github.com/j3k0/cordova-plugin-purchase/issues/1692).
+
+#### (ios) StoreKit 2 reliability fixes
+
+- **Stand down SK1 when StoreKit2Plugin is installed.** When both `cordova-plugin-purchase` and `cordova-plugin-purchase-storekit2` are installed on iOS 15+, SK1 no longer registers an `SKPaymentQueue` observer at launch. This eliminates duplicate transaction delivery and conflicting auto-finish behavior between SK1 and SK2's `Transaction.updates` stream. Requires `cordova-plugin-purchase-storekit2` for detection.
+- **Surface existing subscriptions on Capacitor app relaunch.** The Capacitor SK2 plugin now emits current entitlements as `PaymentTransactionStateRestored` on `init()` so existing subscriptions are visible immediately — no manual restore required. Transaction deduplication via `processedTransactionIds` prevents double-emission from `Transaction.updates`.
+- **Prevent `finish()` cascade on verified receipts.** The adapter's `finish()` now skips `receiptsUpdated` when the transaction is already FINISHED, avoiding cascading receipt update cycles when `finish(VerifiedReceipt)` is called multiple times. Native `finish()` is still called so the StoreKit queue stays clean.
+- **Clear expired SK2 transactions before purchase.** Stale unfinished transactions were blocking SK2 from initiating a new purchase flow. The Capacitor iOS plugin now clears expired unfinished transactions before `product.purchase()`, matching the Cordova SK2 plugin behavior.
+- **Restore FINISHED callback for subscriptions.** Removed a 60-second cooldown on the FINISHED state that was suppressing `finished()` callbacks and leaving the store in an inconsistent state (blocking new purchases). The subscription duplicate-transaction check is kept.
+- **Auto-finish SK2 subscription duplicate transactions at the native level.** When SK2 delivers the same subscription purchase via both `product.purchase()` and `Transaction.updates` (different `transactionId`, same `originalTransactionId` + `purchaseDate`), the duplicate is now finished at the native level. Apple requires `Transaction.finish()` on every transaction — unfinished duplicates were being re-delivered by `Transaction.updates` on every app launch indefinitely.
+- **Deduplicate SK2 subscription transactions in the adapter listener.** Only one of the duplicate events triggers `approved()` and a validation request. Previously both fired, causing two validation calls per purchase.
+- **(ios) `getOffer()` now returns the default offer when discount offers exist.** Previously the method returned the first discount instead of the default offer. Discounts remain accessible by id.
+
+#### (perf) Smaller validation requests
+
+The `products` array (full catalog with offers and pricing phases) is now sent with receipt validation requests at most once per 24 hours instead of on every call, significantly reducing request payload size.
+
+#### StoreKit 2 Plugin
+
+- **cordova-plugin-purchase-storekit2 v1.0.4** — unify native log tag to `CdvPurchase.AppleAppStore.swift` so SK2 output is easier to filter in device logs alongside the rest of the Apple adapter.
+
+### 13.15.1
+
+- **(fix)** `store.getStorefront()` now works on Mac Catalyst (including Capacitor's "Designed for iPad" mode, which runs as a Catalyst AppKit process). The Capacitor plugin falls back to SK2's `Storefront.current` when SK1's `SKPaymentQueue.storefront` is nil, and the SK2 bridge routes through the `StoreKit2Plugin` (requires `cordova-plugin-purchase-storekit2` v1.0.3). See [#1691](https://github.com/j3k0/cordova-plugin-purchase/issues/1691)
+
+#### StoreKit 2 Plugin
+
+- **cordova-plugin-purchase-storekit2 v1.0.3** — add native `getStorefront` using `Storefront.current` (StoreKit 2). Previously the SK2 bridge routed `getStorefront` through the SK1 ObjC plugin, whose `SKPaymentQueue.storefront` returns nil on Mac Catalyst — causing `store.getStorefront()` to reject with "Storefront not available".
+
+### 13.15.0
+
+#### Native Capacitor plugin
+
+The plugin now ships a native Capacitor adapter alongside the Cordova one. Capacitor apps can install `capacitor-plugin-cdv-purchase` directly instead of going through the Cordova compatibility layer. Full native bridges are provided for iOS (StoreKit 1 + StoreKit 2) and Android (Google Play Billing).
+
+**Installation (Capacitor):**
+
+```sh
+npm install capacitor-plugin-cdv-purchase
+npx cap sync
+```
+
+See [capacitor/README.md](./capacitor/README.md) for setup and usage.
+
+CI matrix now covers Capacitor 6, 7, and 8 for iOS, plus Capacitor for Android.
+
+#### (ios) Multi-quantity consumable purchases
+
+Multi-quantity purchases are now supported on iOS in addition to Android. Pass a `quantity` value (1–10, Apple's limit) when calling `store.order()`:
+
+```javascript
+const error = await store.order(offer, { quantity: 3 });
+```
+
+The field lives at the top level of `AdditionalData`, and platforms advertise support via a new `orderQuantity` capability:
+
+```javascript
+if (store.checkSupport(CdvPurchase.Platform.APPLE_APPSTORE, 'orderQuantity')) {
+  // show the quantity picker
+}
+```
+
+See [doc/multi-quantity-purchases.md](./doc/multi-quantity-purchases.md) for details, including the client-side extraction pattern from `VerifiedPurchase` (which gained an optional `quantity` field too).
+
+#### Storefront / country code API
+
+A new `store.getStorefront()` (synchronous accessor) returns the user's billing country — useful for pricing, regional product filtering, or legal prompts. A `storefrontUpdated` event fires when the value changes (cached, fires only on actual change). Values refresh automatically after order, restore, and update flows.
+
+```javascript
+const storefront = store.getStorefront();
+// { countryCode: 'US' }
+
+store.when().storefrontUpdated(s => { /* ... */ });
+```
+
+Supported platforms advertise it via the new `getStorefront` capability. Available on the Apple AppStore adapter (SK1 + SK2), Google Play, and through the native Capacitor plugin.
+
+#### (googleplay) Fix price macros returning zeros for multi-offer in-app products
+
+When a one-time product had multiple offers (v12.0 format), price and currency macros returned zeros because the wrong offer was picked for macro resolution. Now the first available offer with pricing data is used.
+
+#### StoreKit 2 Plugin
+
+- **cordova-plugin-purchase-storekit2 v1.0.1** — load `Transaction.currentEntitlements` at startup so existing subscriptions are visible immediately, instead of requiring a manual restore or a renewal event to surface them.
+
+## 13.14
+
+### 13.14.0
+
+#### (ios) StoreKit 2 support via extension plugin
+
+StoreKit 2 is now supported as an optional extension. When `cordova-plugin-purchase-storekit2` is installed, the Apple AppStore adapter automatically upgrades from StoreKit 1 to StoreKit 2 on iOS 15+ devices — no code changes needed.
+
+**Installation:**
+
+```sh
+cordova plugin add cordova-plugin-purchase-storekit2
+```
+
+**Requirements:** cordova-ios 7+ (tested with cordova-ios 8).
+
+**What changes with StoreKit 2:**
+
+- Per-transaction JWS (JSON Web Signature) tokens replace the monolithic `appStoreReceipt`
+- Receipt validation uses transaction type `apple-sk2` with `jwsRepresentation` field
+- Native async/await APIs for product loading, purchases, and transaction observation
+- Built-in support for manage subscriptions, offer code redemption sheets
+
+**Architecture:**
+
+- Main plugin gains a shared `BridgeInterface`, an SK2 TypeScript bridge, and adapter changes for runtime SK2 detection
+- Extension plugin (`cordova-plugin-purchase-storekit2`) contains only the Swift native code and a JS marker file
+- Falls back to StoreKit 1 when the extension is not installed or on iOS < 15
+
+#### StoreKit 2 Plugin
+
+- **cordova-plugin-purchase-storekit2 v1.0.0** — initial release. Ships the native StoreKit 2 Swift bridge used by the main plugin when the extension is present on iOS 15+.
+
+## 13.13
+
+### 13.13.1
+
+#### (ios) Remove unused FileUtility class — fixes #1657
+
+FileUtility was unused and missing `#import <Foundation/Foundation.h>`, causing build failures with cordova-ios 8 and Capacitor on Xcode 16.
+
+### 13.13.0
+
+#### (googleplay) Upgrade to Google Play Billing Library 8.3.0
+
+Major upgrade from 7.1.1 to 8.3.0. Key changes:
+
+**Breaking Changes (internal):**
+- Updated `enablePendingPurchases()` API to use `PendingPurchasesParams`
+- Requires `minSdkVersion` 23 or higher (Billing Library 8.1.0+ requirement)
+
+**New Features:**
+- Auto service reconnection for more reliable billing client connections
+- One-time product offers - INAPP products can now have multiple offers (v12.0 format)
+- Enabled pending purchases for one-time products and prepaid plans
+- Suspended subscriptions now returned in purchases list (aligns with Apple behavior)
+
+**New Bridge Types:**
+- `InAppOffer` interface for one-time product offers
+- `offers?: InAppOffer[]` on InAppProduct for v12.0 format products
+
+**Note on Suspended Subscriptions:**
+
+Previously, Google Play didn't return suspended subscriptions (paused or payment on hold) in the purchases list. Now it does, aligning with Apple's behavior. Suspended subscriptions have an `expirationDate` in the past, so `product.owned` will correctly return `false`. No code changes are needed - the existing `expirationDate` check handles this automatically.
+
+See Google Play Billing release notes for full details:
+https://developer.android.com/google/play/billing/release-notes
+
 ## 13.12
 
 ### 13.12.1
 
 #### (googleplay) Fix #1434 - validProducts.find is not a product
 
-Somet user had this occasional error:
+Some users had this occasional error:
 
     Error: TypeError: validProducts.find is not a function
         at http://localhost/:9909:64

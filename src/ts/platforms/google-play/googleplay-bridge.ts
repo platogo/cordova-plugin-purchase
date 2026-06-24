@@ -130,7 +130,14 @@ namespace CdvPurchase {
                 /** Token that uniquely identifies a purchase for a given item and user pair. */
                 purchaseToken: string;
 
-                /** quantity of the purchased product */
+                /** Quantity of items purchased in a single transaction.
+                 * 
+                 * For consumable products, this value represents the number of items purchased.
+                 * For non-consumable products and subscriptions, this value is always 1.
+                 * 
+                 * This is particularly useful for apps that support multi-quantity purchases
+                 * through Google Play Billing Library.
+                 */
                 quantity: number;
 
                 /** Whether the purchase has been acknowledged. */
@@ -143,7 +150,7 @@ namespace CdvPurchase {
                 getPurchaseState: PurchaseState;
 
                 /** Whether the subscription renews automatically. */
-                autoRenewing: false;
+                autoRenewing: boolean;
 
                 /** String containing the signature of the purchase data that was signed with the private key of the developer. */
                 signature: string;
@@ -156,6 +163,9 @@ namespace CdvPurchase {
 
                 /** Obfuscated profile id specified at purchase - used when a single user can have multiple profiles */
                 profileId: string;
+
+                /** For subscriptions, timestamp of expiration in milliseconds */
+                expiryTimeMillis?: string;
             }
 
             export enum PurchaseState {
@@ -179,7 +189,7 @@ namespace CdvPurchase {
                 data: { purchase: Purchase; }
             };
 
-            export class Bridge {
+            export class Bridge implements BridgeInterface {
 
                 options: Options = {};
 
@@ -313,6 +323,13 @@ namespace CdvPurchase {
 
                 manageBilling() {
                     return window.cordova.exec(function () { }, function () { }, "InAppBillingPlugin", "manageBilling", []);
+                }
+
+                getStorefront(success: (countryCode: string) => void, fail: ErrorCallback) {
+                    if (this.options.showLog) {
+                        log('getStorefront()');
+                    }
+                    return window.cordova.exec(success, errorCb(fail), "InAppBillingPlugin", "getStorefront", []);
                 }
 
                 launchPriceChangeConfirmationFlow(productId: string) {
