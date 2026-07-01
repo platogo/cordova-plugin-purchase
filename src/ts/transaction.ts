@@ -69,6 +69,18 @@ namespace CdvPurchase
         /** Currency used to pay for the transaction, if known. */
         currency?: string;
 
+        /**
+         * Quantity of items purchased in a single transaction.
+         *
+         * For consumable products, this value represents the number of items purchased.
+         * For non-consumable products and subscriptions, this value is always 1.
+         *
+         * Supported on Android (Google Play) and iOS (Apple AppStore).
+         * Use `additionalData.quantity` when placing an order
+         * to purchase multiple units in a single transaction.
+         */
+        quantity?: number;
+
         /** Purchased products */
         products: {
 

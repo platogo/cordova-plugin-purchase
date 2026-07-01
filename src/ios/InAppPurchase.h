@@ -17,8 +17,6 @@
 
 #import "SKProduct+LocalizedPrice.h"
 #import "SKProductDiscount+LocalizedPrice.h"
-#import "FileUtility.h"
-
 @interface InAppPurchase : CDVPlugin <SKPaymentTransactionObserver> {
     NSMutableDictionary *products;
     NSMutableDictionary *retainer;
@@ -46,6 +44,7 @@
 - (void) debug: (CDVInvokedUrlCommand*)command;
 - (void) autoFinish: (CDVInvokedUrlCommand*)command;
 - (void) finishTransaction: (CDVInvokedUrlCommand*)command;
+- (void) getStorefront: (CDVInvokedUrlCommand*)command;
 
 - (void) onReset;
 - (void) processPendingTransactionUpdates;

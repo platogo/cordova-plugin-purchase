@@ -4,6 +4,7 @@
 /// <reference path="validator/validator.ts" />
 /// <reference path="log.ts" />
 /// <reference path="internal/adapters.ts" />
+/// <reference path="internal/storefronts.ts" />
 /// <reference path="internal/adapter-listener.ts" />
 /// <reference path="internal/callbacks.ts" />
 /// <reference path="internal/ready.ts" />
@@ -21,10 +22,23 @@
  *
  * When you see, for example `ProductType.PAID_SUBSCRIPTION`, it refers to `CdvPurchase.ProductType.PAID_SUBSCRIPTION`.
  *
- * In the files that interact with the plugin, I recommend creating those shortcuts (and more if needed):
+ * In your code, you should access members directly through the CdvPurchase namespace:
  *
  * ```ts
- * const {store, ProductType, Platform, LogLevel} = CdvPurchase;
+ * // Recommended approach (works reliably with minification)
+ * CdvPurchase.store.initialize();
+ * CdvPurchase.store.register({
+ *   id: 'my-product',
+ *   type: CdvPurchase.ProductType.PAID_SUBSCRIPTION,
+ *   platform: CdvPurchase.Platform.APPLE_APPSTORE
+ * });
+ * ```
+ *
+ * Note: Using destructuring with the namespace may cause issues with minification tools:
+ *
+ * ```ts
+ * // NOT recommended - may cause issues with minification tools like Terser
+ * const { store, ProductType, Platform, LogLevel } = CdvPurchase;
  * ```
  */
 namespace CdvPurchase {
@@ -32,7 +46,7 @@ namespace CdvPurchase {
     /**
      * Current release number of the plugin.
      */
-    export const PLUGIN_VERSION = '13.12.1';
+    export const PLUGIN_VERSION = '13.15.4';
 
     /**
      * Entry class of the plugin.
@@ -181,6 +195,9 @@ namespace CdvPurchase {
         /** Callbacks for errors */
         private errorCallbacks = new Internal.Callbacks<IError>(this.log, 'error()');
 
+        /** Per-platform storefront cache and change notifications. */
+        private _storefronts = new Internal.Storefronts(this.log.child('Storefronts'));
+
         /** Internal implementation of the receipt validation service integration */
         private _validator: Internal.Validator;
 
@@ -200,6 +217,12 @@ namespace CdvPurchase {
                 finishedCallbacks: this.finishedCallbacks,
                 pendingCallbacks: this.pendingCallbacks,
                 receiptsReadyCallbacks: this.receiptsReadyCallbacks,
+                finishDuplicate: (transaction: Transaction) => {
+                    const adapter = this.adapters.findReady(transaction.platform);
+                    if (adapter) {
+                        adapter.finish(transaction);
+                    }
+                },
             }, this.log);
             this.transactionStateMonitors = new Internal.TransactionStateMonitors(this.when());
             this._validator = new Internal.Validator({
@@ -223,15 +246,24 @@ namespace CdvPurchase {
                 log: this.log,
             }).launch();
             this.expiryMonitor = new Internal.ExpiryMonitor({
-                // get localReceipts() { return store.localReceipts; },
+                get localReceipts() {
+                    // Only use local receipts if there's no validator configured
+                    return store.validator ? [] : store.localReceipts;
+                },
                 get verifiedReceipts() { return store.verifiedReceipts; },
-                // onTransactionExpired(transaction) {
-                // store.approvedCallbacks.trigger(transaction);
-                // },
+                onTransactionExpired(transaction) {
+                    store.log.debug(`Local transaction expired (${transaction.transactionId}), refreshing purchases`);
+                    if (!store.validator) {
+                        const productId = transaction.products[0]?.id;
+                        if (productId && !store.owned(productId)) {
+                            store.updatedReceiptsCallbacks.trigger(transaction.parentReceipt, 'expiry_monitor_transaction_expired');
+                        }
+                    }
+                },
                 onVerifiedPurchaseExpired(verifiedPurchase, receipt) {
                     store.verify(receipt.sourceReceipt);
                 },
-            });
+            }, this.log);
             this.expiryMonitor.launch();
         }
 
@@ -252,8 +284,22 @@ namespace CdvPurchase {
          *       type: ProductType.CONSUMABLE,
          *       platform: Platform.BRAINTREE,
          *   }]);
+         *
+         * // Can also be used in development to register test products
+         * store.register([{
+         *   id: 'my-custom-product',
+         *   type: CdvPurchase.ProductType.CONSUMABLE,
+         *   platform: CdvPurchase.Platform.TEST,
+         *   title: '...',
+         *   description: 'A custom test consumable product',
+         *   pricing: {
+         *     price: '$2.99',
+         *     currency: 'USD',
+         *     priceMicros: 2990000
+         *   }
+         * }]);
          */
-        register(product: IRegisterProduct | IRegisterProduct[]) {
+        register(product: IRegisterProduct | Test.IRegisterTestProduct | (IRegisterProduct | Test.IRegisterTestProduct)[]) {
             const errors = this.registeredProducts.add(product);
             errors.forEach(error => {
                 store.errorCallbacks.trigger(error, 'register_error');
@@ -284,6 +330,7 @@ namespace CdvPurchase {
                 get listener() { return store.listener; },
                 get log() { return store.log; },
                 get registeredProducts() { return store.registeredProducts; },
+                get storefronts() { return store._storefronts; },
                 apiDecorators: {
                     canPurchase: this.canPurchase.bind(this),
                     owned: this.owned.bind(this),
@@ -331,10 +378,14 @@ namespace CdvPurchase {
             this.lastUpdate = now;
             // Load products metadata
             for (const registration of this.registeredProducts.byPlatform()) {
-                const products = await this.adapters.findReady(registration.platform)?.loadProducts(registration.products);
+                const adapter = this.adapters.findReady(registration.platform);
+                const products = await adapter?.loadProducts(registration.products);
                 products?.forEach(p => {
                     if (p instanceof Product) this.updatedCallbacks.trigger(p, 'update_has_loaded_products');
                 });
+                if (adapter) {
+                    this._storefronts.refreshWith(adapter).catch(() => { /* tolerated */ });
+                }
             }
         }
 
@@ -388,6 +439,8 @@ namespace CdvPurchase {
                 unverified: (cb: Callback<UnverifiedReceipt>, callbackName?: string) => (this.unverifiedCallbacks.push(cb, callbackName), ret),
                 receiptsReady: (cb: Callback<void>, callbackName?: string) => (this.receiptsReadyCallbacks.push(cb, callbackName), ret),
                 receiptsVerified: (cb: Callback<void>, callbackName?: string) => (this.receiptsVerifiedCallbacks.push(cb, callbackName), ret),
+                storefrontUpdated: (cb: Callback<Storefront>, callbackName?: string) =>
+                    (this._storefronts.listen(cb, callbackName), ret),
             };
             return ret;
         }
@@ -407,6 +460,7 @@ namespace CdvPurchase {
             this.receiptsVerifiedCallbacks.remove(callback as any);
             this.errorCallbacks.remove(callback as any);
             this._readyCallbacks.remove(callback as any);
+            this._storefronts.off(callback as any);
         }
 
         /**
@@ -531,6 +585,8 @@ namespace CdvPurchase {
             if (!adapter) return storeError(ErrorCode.PAYMENT_NOT_ALLOWED, 'Adapter not found or not ready (' + offer.platform + ')', offer.platform, null);
             const ret = await adapter.order(offer, additionalData || {});
             if (ret && 'isError' in ret) store.triggerError(ret);
+            // Account may have switched during checkout — refresh storefront in the background.
+            this._storefronts.refreshWith(adapter).catch(() => { /* tolerated */ });
             return ret;
         }
 
@@ -590,6 +646,7 @@ namespace CdvPurchase {
 
             const promise = new PaymentRequestPromise();
             adapter.requestPayment(paymentRequest, additionalData).then(result => {
+                this._storefronts.refreshWith(adapter).catch(() => { /* tolerated */ });
                 promise.trigger(result);
                 if (result instanceof Transaction) {
                     const onStateChange = (state: TransactionState) => {
@@ -633,6 +690,9 @@ namespace CdvPurchase {
          * Finalize a transaction.
          *
          * This will be called from the Receipt, Transaction or VerifiedReceipt objects using the API decorators.
+         *
+         * If the transaction has already been consumed or acknowledged according to the verification API,
+         * the native platform's finish method will be skipped to avoid errors.
          */
         private async finish(receipt: Transaction | Receipt | VerifiedReceipt) {
             this.log.info(`finish(${receipt.className})`);
@@ -642,8 +702,43 @@ namespace CdvPurchase {
                     : receipt instanceof Receipt
                         ? receipt.transactions
                         : [receipt];
+
             transactions.forEach(transaction => {
-                const adapter = this.adapters.findReady(transaction.platform)?.finish(transaction);
+                // Check if this transaction has already been consumed or acknowledged according to verification API
+                let skipNativeFinish = false;
+
+                if (this.validator && receipt instanceof VerifiedReceipt) {
+                    // Find matching purchase in the verified collection
+                    const verifiedPurchase = receipt.collection.find(p => {
+                        // Match by transactionId if available
+                        return (p.transactionId && p.transactionId === transaction.transactionId);
+                    });
+
+                    if (verifiedPurchase) {
+                        // Check if transaction is acknowledged
+                        if (verifiedPurchase.isAcknowledged === true) {
+                            this.log.info(`Transaction ${transaction.transactionId} already acknowledged according to verification API`);
+                            transaction.isAcknowledged = true;
+                            skipNativeFinish = true;
+                        }
+
+                        // Check if transaction is consumed
+                        if (verifiedPurchase.isConsumed === true) {
+                            this.log.info(`Transaction ${transaction.transactionId} already consumed according to verification API`);
+                            transaction.isConsumed = true;
+                            skipNativeFinish = true;
+                        }
+                    }
+                }
+
+                const adapter = this.adapters.findReady(transaction.platform);
+
+                if (adapter?.canSkipFinish && skipNativeFinish && transaction.state === TransactionState.APPROVED) {
+                    transaction.state = TransactionState.FINISHED;
+                }
+                else {
+                    const adapter = this.adapters.findReady(transaction.platform)?.finish(transaction);
+                }
             });
         }
 
@@ -657,6 +752,8 @@ namespace CdvPurchase {
             for (const adapter of this.adapters.list) {
                 if (adapter.ready) {
                     error = error ?? await adapter.restorePurchases();
+                    // Restore often implies a login or account switch — refresh storefront.
+                    this._storefronts.refreshWith(adapter).catch(() => { /* tolerated */ });
                 }
             }
             return error;
@@ -694,6 +791,41 @@ namespace CdvPurchase {
             const adapter = this.adapters.findReady(platform);
             if (!adapter) return storeError(ErrorCode.SETUP, "Found no adapter ready to handle 'manageBilling'", platform ?? null, null);
             return adapter.manageBilling();
+        }
+
+        /**
+         * Retrieve the billing country code from the platform's storefront.
+         *
+         * Returns a `Storefront` object with the platform and its ISO 3166-1
+         * alpha-2 country code (e.g., "US", "FR"). The country code may be
+         * undefined if the underlying fetch has not yet completed or failed —
+         * the platform is still reported. Returns `undefined` only when no
+         * matching adapter is ready.
+         *
+         * The cache is populated before the `storeReady` event fires (with a
+         * best-effort timeout), and refreshed after orders and `restorePurchases()`.
+         *
+         * @param platform - Optional platform. If omitted, returns the first
+         *                   cached non-empty storefront, or a `{ platform, countryCode: undefined }`
+         *                   object for the first ready adapter.
+         *
+         * @example
+         * const storefront = store.getStorefront();
+         * if (storefront?.countryCode) {
+         *     console.log(`Billing country: ${storefront.countryCode}`);
+         * }
+         */
+        getStorefront(platform?: Platform): Storefront | undefined {
+            if (platform) {
+                const adapter = this.adapters.findReady(platform);
+                if (!adapter) return undefined;
+                return this._storefronts.getValueFor(platform);
+            }
+            const cached = this._storefronts.getValueFor();
+            if (cached) return cached;
+            const firstReady = this.adapters.findReady();
+            if (!firstReady) return undefined;
+            return { platform: firstReady.id, countryCode: undefined };
         }
 
         /**

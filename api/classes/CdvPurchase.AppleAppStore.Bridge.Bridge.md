@@ -2,6 +2,13 @@
 
 [AppleAppStore](../modules/CdvPurchase.AppleAppStore.md).[Bridge](../modules/CdvPurchase.AppleAppStore.Bridge.md).Bridge
 
+Shared interface implemented by both the SK1 and SK2 bridges.
+The adapter programs against this interface, not a concrete class.
+
+## Implements
+
+- [`BridgeInterface`](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md)
+
 ## Table of contents
 
 ### Constructors
@@ -15,6 +22,7 @@
 - [onPurchased](CdvPurchase.AppleAppStore.Bridge.Bridge.md#onpurchased)
 - [onRestored](CdvPurchase.AppleAppStore.Bridge.Bridge.md#onrestored)
 - [options](CdvPurchase.AppleAppStore.Bridge.Bridge.md#options)
+- [pendingTransactionsReady](CdvPurchase.AppleAppStore.Bridge.Bridge.md#pendingtransactionsready)
 - [transactionsForProduct](CdvPurchase.AppleAppStore.Bridge.Bridge.md#transactionsforproduct)
 
 ### Methods
@@ -22,6 +30,7 @@
 - [canMakePayments](CdvPurchase.AppleAppStore.Bridge.Bridge.md#canmakepayments)
 - [finalizeTransactionUpdates](CdvPurchase.AppleAppStore.Bridge.Bridge.md#finalizetransactionupdates)
 - [finish](CdvPurchase.AppleAppStore.Bridge.Bridge.md#finish)
+- [getStorefront](CdvPurchase.AppleAppStore.Bridge.Bridge.md#getstorefront)
 - [init](CdvPurchase.AppleAppStore.Bridge.Bridge.md#init)
 - [lastTransactionUpdated](CdvPurchase.AppleAppStore.Bridge.Bridge.md#lasttransactionupdated)
 - [load](CdvPurchase.AppleAppStore.Bridge.Bridge.md#load)
@@ -55,6 +64,10 @@
 • `Optional` **appStoreReceipt**: ``null`` \| [`ApplicationReceipt`](../interfaces/CdvPurchase.AppleAppStore.ApplicationReceipt.md)
 
 The application receipt from AppStore, cached in javascript
+
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[appStoreReceipt](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#appstorereceipt)
 
 ___
 
@@ -90,6 +103,18 @@ Callbacks set by the adapter
 
 ___
 
+### pendingTransactionsReady
+
+• `Optional` **pendingTransactionsReady**: `Promise`\<`void`\>
+
+Resolves when pending transactions from the native queue have been processed
+
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[pendingTransactionsReady](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#pendingtransactionsready)
+
+___
+
 ### transactionsForProduct
 
 • **transactionsForProduct**: `Object` = `{}`
@@ -99,6 +124,10 @@ Transactions for a given product
 #### Index signature
 
 ▪ [productId: `string`]: `string`[]
+
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[transactionsForProduct](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#transactionsforproduct)
 
 ## Methods
 
@@ -118,6 +147,10 @@ Checks if device/user is allowed to make in-app purchases
 #### Returns
 
 `void`
+
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[canMakePayments](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#canmakepayments)
 
 ___
 
@@ -147,6 +180,26 @@ ___
 
 `void`
 
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[finish](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#finish)
+
+___
+
+### getStorefront
+
+▸ **getStorefront**(): `Promise`\<`undefined` \| `string`\>
+
+Retrieve the storefront country code from StoreKit
+
+#### Returns
+
+`Promise`\<`undefined` \| `string`\>
+
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[getStorefront](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#getstorefront)
+
 ___
 
 ### init
@@ -168,6 +221,10 @@ This calls the native "setup" method from the "InAppPurchase" Objective-C class.
 #### Returns
 
 `void`
+
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[init](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#init)
 
 ___
 
@@ -200,6 +257,10 @@ string), name, description of multiple products.
 
 `void`
 
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[load](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#load)
+
 ___
 
 ### loadReceipts
@@ -217,6 +278,10 @@ ___
 
 `void`
 
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[loadReceipts](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#loadreceipts)
+
 ___
 
 ### manageBilling
@@ -233,6 +298,10 @@ ___
 
 `void`
 
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[manageBilling](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#managebilling)
+
 ___
 
 ### manageSubscriptions
@@ -248,6 +317,10 @@ ___
 #### Returns
 
 `void`
+
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[manageSubscriptions](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#managesubscriptions)
 
 ___
 
@@ -280,6 +353,10 @@ ___
 #### Returns
 
 `void`
+
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[presentCodeRedemptionSheet](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#presentcoderedemptionsheet)
 
 ___
 
@@ -314,6 +391,10 @@ Makes an in-app purchase.
 
 `void`
 
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[purchase](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#purchase)
+
 ___
 
 ### refreshReceipts
@@ -330,6 +411,10 @@ ___
 #### Returns
 
 `void`
+
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[refreshReceipts](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#refreshreceipts)
 
 ___
 
@@ -350,6 +435,10 @@ The restored transactions are passed to the onRestored callback, so make sure yo
 #### Returns
 
 `void`
+
+#### Implementation of
+
+[BridgeInterface](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md).[restore](../interfaces/CdvPurchase.AppleAppStore.Bridge.BridgeInterface.md#restore)
 
 ___
 
@@ -381,7 +470,7 @@ ___
 
 ### transactionUpdated
 
-▸ **transactionUpdated**(`state`, `errorCode`, `errorText`, `transactionIdentifier`, `productId`, `transactionReceipt`, `originalTransactionIdentifier`, `transactionDate`, `discountId`): `void`
+▸ **transactionUpdated**(`state`, `errorCode`, `errorText`, `transactionIdentifier`, `productId`, `transactionReceipt`, `originalTransactionIdentifier`, `transactionDate`, `discountId`, `quantity`): `void`
 
 #### Parameters
 
@@ -396,6 +485,7 @@ ___
 | `originalTransactionIdentifier` | `undefined` \| `string` |
 | `transactionDate` | `undefined` \| `string` |
 | `discountId` | `undefined` \| `string` |
+| `quantity` | `undefined` \| `number` |
 
 #### Returns
 
