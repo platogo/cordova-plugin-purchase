@@ -383,7 +383,7 @@ public final class PurchasePlugin
         callSuccess(toJSON(purchases));
       } else {
         callError(Constants.ERR_LOAD, "Failed to query purchases: "
-            + result.getResponseCode());
+            + format(result));
       }
     } catch (Exception e) {
       Log.e(mTag, "onQueryPurchasesFinished() -> Failed: " + e.getMessage());
@@ -422,6 +422,17 @@ public final class PurchasePlugin
   BillingResult mInAppResult;
   BillingResult mSubsResult;
 
+  // Google returns two results: one for one-time purchases (INAPP, e.g. coin packs), which are
+  // always queried, and one for subscriptions (SUBS), which are only queried when
+  // areSubscriptionsSupported() returns true. Return the one-time result, except when it failed
+  // and the subscriptions query ran: then return the subscriptions result.
+  private BillingResult getQueryPurchasesResult() {
+    if (mInAppResult.getResponseCode() == BillingResponseCode.OK || mSubsResult == null) {
+      return mInAppResult;
+    }
+    return mSubsResult;
+  }
+
   /**
    * Query purchases across various use cases and deliver the result in a
    * formalized way through a listener.
@@ -444,7 +455,7 @@ public final class PurchasePlugin
             if (billingResult.getResponseCode() == BillingResponseCode.OK)
               allPurchases.addAll(purchases);
             if (mInAppResult != null && (mSubsResult != null || !areSubscriptionsSupported()))
-              onQueryPurchasesFinished(mInAppResult.getResponseCode() == BillingResponseCode.OK ? mInAppResult : mSubsResult, allPurchases);
+              onQueryPurchasesFinished(getQueryPurchasesResult(), allPurchases);
           }
         }
       );
@@ -459,7 +470,7 @@ public final class PurchasePlugin
               if (billingResult.getResponseCode() == BillingResponseCode.OK)
                 allPurchases.addAll(purchases);
               if (mInAppResult != null && (mSubsResult != null || !areSubscriptionsSupported()))
-                onQueryPurchasesFinished(mInAppResult.getResponseCode() == BillingResponseCode.OK ? mInAppResult : mSubsResult, allPurchases);
+                onQueryPurchasesFinished(getQueryPurchasesResult(), allPurchases);
             }
           }
         );
